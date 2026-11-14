@@ -1,0 +1,23 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: ziwen
+
+# AI 配置（敏感信息一律环境变量注入，勿硬编码）
+ai:
+  # 对话模型：OpenAI 兼容协议，base-url 指向 DeepSeek / 通义 / OneAPI 均可
+  chat:
+    base-url: ${AI_CHAT_BASE_URL:https://api.deepseek.com/v1}
+    api-key: ${AI_CHAT_API_KEY:}
+    model-name: ${AI_CHAT_MODEL:deepseek-v4-pro}
+
+    temperature: 0.7
+  # 多轮对话记忆
+  memory:
+    max-messages: 20   #每个会话保留的最大消息条数
+
+logging:
+  level:
+    dev.langchain4j: INFO

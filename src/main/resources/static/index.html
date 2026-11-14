@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>字问 · 伴读小伙伴</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f7f4ee;
+      display: flex; justify-content: center;
+      min-height: 100vh; padding: 24px 16px;
+    }
+    .app { width: 100%; max-width: 640px; display: flex; flex-direction: column; }
+    header { text-align: center; margin-bottom: 16px; }
+    header h1 { font-size: 22px; color: #4a3b2a; }
+    header p { font-size: 13px; color: #9a8f80; margin-top: 4px; }
+    #chat {
+      flex: 1; overflow-y: auto; background: #fff; border-radius: 12px;
+      padding: 16px; min-height: 300px; max-height: 60vh;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .msg { margin: 8px 0; line-height: 1.7; font-size: 15px; white-space: pre-wrap; }
+    .user { text-align: right; }
+    .user span {
+      background: #e8f0de; color: #3d5226; padding: 8px 12px;
+      border-radius: 12px 12px 2px 12px; display: inline-block; text-align: left;
+    }
+    .ai span {
+      background: #f5efe3; color: #4a3b2a; padding: 8px 12px;
+      border-radius: 12px 12px 12px 2px; display: inline-block;
+    }
+    form { display: flex; gap: 8px; margin-top: 12px; }
+    input {
+      flex: 1; padding: 12px 14px; border: 1px solid #ddd2c2;
+      border-radius: 10px; font-size: 15px; outline: none; background: #fff;
+    }
+    input:focus { border-color: #b5a488; }
+    button {
+      padding: 12px 20px; background: #6b8e4e; color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; cursor: pointer;
+    }
+    button:disabled { background: #b8c4ab; cursor: not-allowed; }
+    .hint { text-align: center; font-size: 12px; color: #b0a695; margin-top: 8px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>字问先生</h1>
+    <p>问一个字，问一首诗，陪娃学习</p>
+  </header>
+  <div id="chat"></div>
+  <form id="form">
+    <input id="q" placeholder="例如：灌溉的"灌"怎么写？" autocomplete="off" autofocus>
+    <button id="send" type="submit">问</button>
+  </form>
+  <p class="hint">sessionId: <span id="sid"></span>（记忆按会话保存在服务内存，重启服务会清空）</p>
+</div>
+<script>
+  // 会话 ID 存 localStorage，刷新页面记忆不断
+  let sessionId = localStorage.getItem('ziwen-session');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem('ziwen-session', sessionId);
+  }
+  document.getElementById('sid').textContent = sessionId.slice(0, 8);
+
+  const chat = document.getElementById('chat');
+  const form = document.getElementById('form');
+  const input = document.getElementById('q');
+  const send = document.getElementById('send');
+
+  function bubble(role, text) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    const span = document.createElement('span');
+    span.textContent = text;
+    div.appendChild(span);
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return span;
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const question = input.value.trim();
+    if (!question) return;
+    input.value = '';
+    send.disabled = true;
+    bubble('user', question);
+    const aiSpan = bubble('ai', '');
+
+    // SSE 流式：EventSource 只支持 GET
+    const es = new EventSource(
+      '/api/chat/stream?sessionId=' + encodeURIComponent(sessionId) +
+      '&question=' + encodeURIComponent(question));
+
+    es.onmessage = (ev) => { aiSpan.textContent += ev.data; chat.scrollTop = chat.scrollHeight; };
+    es.onerror = () => {
+      es.close();
+      if (!aiSpan.textContent) aiSpan.textContent = '（出错了，请稍后再试）';
+      send.disabled = false; input.focus();
+    };
+    // 流结束：onerror 也会触发一次（连接关闭），上面已兜底
+  });
+</script>
+</body>
+</html>
