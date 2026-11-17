@@ -3,12 +3,15 @@ package com.tong.ziwen.ai.controller;
 import com.tong.ziwen.ai.common.Response;
 import com.tong.ziwen.ai.dto.ChatRequest;
 import com.tong.ziwen.ai.service.Companion;
+import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * 对话接口：同步问答 + SSE 流式问答。
+ * 对话接口：同步问答 + SSE 流式问答 + 删除会话记忆。
  */
 @Slf4j
 @RestController
@@ -26,6 +29,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class ChatController {
 
     private final Companion companion;
+    private final ChatMemoryStore chatMemoryStore;
 
     /**
      * 同步问答：一次性返回完整回答。
@@ -56,5 +60,14 @@ public class ChatController {
                 })
                 .start();
         return emitter;
+    }
+
+    /**
+     * 删除整个会话的记忆：前端"删除会话"时同步清掉 Redis 里的记忆。
+     */
+    @DeleteMapping("/{sessionId}")
+    public Response<Void> clearMemory(@PathVariable String sessionId) {
+        chatMemoryStore.deleteMessages(sessionId);
+        return Response.ok(null);
     }
 }

@@ -1,0 +1,32 @@
+### 记忆落 Redis（对应 tag v0.1.1）——验证"重启不失忆"
+### 前置：docker compose up -d（起 Redis）+ mvn spring-boot:run
+### 想看逐字流式效果去 chat.http，本文件专注验证记忆的"存"与"活"
+
+@host = http://localhost:8082
+
+### 1. 第一句：告诉它一个秘密（这句话会写进 Redis）
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "memory-test-1", "question": "记住哦，我最喜欢的诗是《望庐山瀑布》"}
+
+### 2. 去 Redis 里亲眼看一下记忆（终端里跑，不用 REST Client）
+###    redis-cli
+###    > KEYS ziwen:chat:memory:*          -- 能看到 ziwen:chat:memory:memory-test-1
+###    > TTL ziwen:chat:memory:memory-test-1   -- 604800 左右（7 天），每聊一句自动续期
+###    > GET ziwen:chat:memory:memory-test-1   -- 带.type 判别字段的 JSON：SYSTEM/USER/AI
+
+### 3. 重启服务（Ctrl+C 后重新 mvn spring-boot:run），再问——v0.1 到这里就忘了，现在还记得
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "memory-test-1", "question": "我最喜欢的诗是什么来着"}
+
+### 4. 滑动过期：再聊一句，回第 2 步看 TTL，会发现被刷新回 7 天
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "memory-test-1", "question": "谢谢，今晚就背它"}
+
+### 5. 删除会话记忆：清掉 Redis 里该 sessionId 的 key
+DELETE {{host}}/api/chat/memory-test-1

@@ -3,6 +3,7 @@ package com.tong.ziwen.ai.config;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import com.tong.ziwen.ai.store.RedisChatMemoryStore;
 import com.tong.ziwen.ai.service.Companion;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
@@ -51,15 +52,19 @@ public class AiConfig {
     }
 
     /**
-     * 多轮对话记忆：每个会话一个滑动窗口，存在 JVM 内存里。
+     * 多轮对话记忆：每个会话一个滑动窗口，窗口内容整体落到 Redis。
      *
-     * <p>不指定 {@code chatMemoryStore(...)} 时，窗口默认落在内存——服务重启即失忆；</p>
+     * <p>窗口策略（留最近多少条）和存储（存到哪）在这里合体：
+     * {@code MessageWindowChatMemory} 负责裁剪，{@code RedisChatMemoryStore} 负责落盘，
+     * 服务重启后同一 {@code memoryId} 还能读回历史——"重启不失忆"就靠这一行
+     * {@code chatMemoryStore(...)}。</p>
      */
     @Bean
-    public ChatMemoryProvider chatMemoryProvider() {
+    public ChatMemoryProvider chatMemoryProvider(RedisChatMemoryStore chatMemoryStore) {
         return memoryId -> MessageWindowChatMemory.builder()
                 .id(memoryId)
                 .maxMessages(properties.getMemory().getMaxMessages())
+                .chatMemoryStore(chatMemoryStore)
                 .build();
     }
 

@@ -1,0 +1,17 @@
+# 字问的外部依赖：目前只有 Redis。
+# 用法：docker compose up -d，然后 mvn spring-boot:run
+services:
+  redis:
+    image: redis:8-alpine
+    container_name: ziwen-redis
+    ports:
+      - "6379:6379"
+    # 进程自愈：崩溃/宿主机重启自动拉起（手动 stop 的除外）
+    restart: unless-stopped
+    # 数据自愈：每条写命令落盘，进程重启后重放恢复；不开则只剩默认 RDB 快照，会丢最近几分钟
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-redis1234}"]
+    volumes:
+      - ziwen-redis-data:/data
+
+volumes:
+  ziwen-redis-data:

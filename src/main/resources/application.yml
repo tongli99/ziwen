@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: ziwen
+  # 对话记忆所在的 Redis（v0.1.1 起；docker compose up -d 一条命令起一个）
+  data:
+    redis:
+      host: ${AI_REDIS_HOST:localhost}
+      port: ${AI_REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:redis1234}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3s
 
 # AI 配置（敏感信息一律环境变量注入，勿硬编码）
 ai:
@@ -14,9 +22,11 @@ ai:
     model-name: ${AI_CHAT_MODEL:deepseek-v4-pro}
 
     temperature: 0.7
-  # 多轮对话记忆
+  # 多轮对话记忆（窗口策略 + Redis 存储）
   memory:
     max-messages: 20   #每个会话保留的最大消息条数
+    key-prefix: "ziwen:chat:memory:"   #完整 key = 前缀 + sessionId
+    ttl: 7d           #滑动过期：每轮对话后刷新，连续 7 天不聊的会话自动清理
 
 logging:
   level:

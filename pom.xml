@@ -11,9 +11,9 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.ziwen</groupId>
+    <groupId>com.tong</groupId>
     <artifactId>ziwen</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <name>ziwen</name>
     <description>字问 —— 陪娃学习的 AI 替身（LangChain4j 教程系列配套项目）</description>
 
@@ -52,6 +52,11 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
+        </dependency>
+        <!-- 对话记忆持久化：Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <dependency>
