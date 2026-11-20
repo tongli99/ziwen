@@ -22,6 +22,15 @@ ai:
     model-name: ${AI_CHAT_MODEL:deepseek-v4-pro}
 
     temperature: 0.7
+  # embedding 模型：第二提供方。DeepSeek 只有 chat 没有 embedding，
+  # 这里指向通义千问 DashScope 的 OpenAI 兼容端点——同一套协议模块，只换地址和模型名
+  embedding:
+    base-url: ${AI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    api-key: ${AI_EMBEDDING_API_KEY:}
+    model-name: ${AI_EMBEDDING_MODEL:text-embedding-v3}
+  # 古诗 RAG 检索
+  rag:
+    max-results: 3   #每次检索最多带回几首古诗
   # 多轮对话记忆（窗口策略 + Redis 存储）
   memory:
     max-messages: 20   #每个会话保留的最大消息条数

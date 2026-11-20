@@ -1,0 +1,35 @@
+### 古诗 RAG（对应 tag v0.2）——验证"让 AI 背对诗"
+### 前置：mvn spring-boot:run（启动时自动把古诗语料向量化入库；本篇起需要 embedding 的 key）
+### 想看记忆的存与活去 memory.http，本文件专注验证 RAG 的检索与回答
+
+@host = http://localhost:8082
+
+### 1. 看语料：古诗库里有哪些诗（对照课本录入的原始数据）
+GET {{host}}/api/poems
+
+### 2. 裸检索：不调 chat 模型，亲眼看到"瀑布那首"命中《望庐山瀑布》+ 相似度得分
+GET {{host}}/api/poems/search?question=二年级那首写瀑布的诗
+
+### 2.1 再试一句字面不沾边的："瀑布那首"里没有"望庐山"三个字，照样命中
+GET {{host}}/api/poems/search?question=瀑布那首
+
+### 3. 正式问答：全诗 + 题目作者 + 出处（引用回显）
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "rag-test-1", "question": "二年级那首写瀑布的诗是什么？背给我听听"}
+
+### 4. 库外的诗：该老实说没有，而不是凭记忆背一段（防幻觉验收）
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "rag-test-1", "question": "帮我背一下《将进酒》"}
+
+### 5. 无关问题：检索结果每轮都会注入，但不该硬扯古诗
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "rag-test-1", "question": "我今天有点累"}
+
+### 6. 流式也走 RAG：逐 token 输出，出处照样带
+GET {{host}}/api/chat/stream?sessionId=rag-test-1&question=那首写瀑布的，作者是谁呀

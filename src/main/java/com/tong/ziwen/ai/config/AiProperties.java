@@ -25,8 +25,15 @@ public class AiProperties {
     @Valid
     private Chat chat = new Chat();
 
+    /** embedding 模型配置 */
+    @Valid
+    private Embedding embedding = new Embedding();
+
     /** 多轮对话记忆配置 */
     private Memory memory = new Memory();
+
+    /** RAG 检索配置 */
+    private Rag rag = new Rag();
 
     /** 对话模型连接与采样参数（base-url 指向任意 OpenAI 兼容端点）。 */
     @Data
@@ -38,6 +45,29 @@ public class AiProperties {
         @NotBlank
         private String modelName;
         private Double temperature;
+    }
+
+    /**
+     * embedding 模型连接参数。
+     *
+     * <p>chat 和 embedding 分开配置：有的厂商（如 DeepSeek）只有 chat 没有 embedding 接口；
+     * 就算一家能全包，也未必每个能力都最强——分开指向，每个功能用各自最合适的提供方。</p>
+     */
+    @Data
+    public static class Embedding {
+        @NotBlank
+        private String baseUrl;
+        @NotBlank
+        private String apiKey;
+        @NotBlank
+        private String modelName;
+    }
+
+    /** RAG 检索参数。 */
+    @Data
+    public static class Rag {
+        /** 每次检索带回的匹配数目：太少容易漏，太多会稀释无关回答。 */
+        private int maxResults = 3;
     }
 
     @Data

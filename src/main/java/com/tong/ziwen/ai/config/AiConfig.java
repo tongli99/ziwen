@@ -11,6 +11,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -70,17 +71,22 @@ public class AiConfig {
 
     /**
      * "伴读爸爸妈妈"：AiServices 动态代理，人设由 system prompt 定义，记忆按会话隔离。
+     *
+     * <p>v0.2 起挂上 {@code retrievalAugmentor}：每轮对话先把用户问题拿去检索古诗库，
+     * 命中的诗直接拼进这条消息再交给模型——对话代码因此一行不用改。</p>
      */
     @Bean
     public Companion companion(ChatModel chatModel,
                            StreamingChatModel streamingChatModel,
-                           ChatMemoryProvider chatMemoryProvider) {
+                           ChatMemoryProvider chatMemoryProvider,
+                           RetrievalAugmentor retrievalAugmentor) {
         String systemPrompt = readSystemPrompt();
         return AiServices.builder(Companion.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(chatMemoryProvider)
                 .systemMessageProvider(memoryId -> systemPrompt)
+                .retrievalAugmentor(retrievalAugmentor)
                 .build();
     }
 
