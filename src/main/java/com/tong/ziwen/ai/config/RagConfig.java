@@ -1,25 +1,31 @@
 package com.tong.ziwen.ai.config;
 
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
+
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.model.input.PromptTemplate;
+import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.rag.content.injector.DefaultContentInjector;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
+import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
+import io.qdrant.client.QdrantClient;
+import io.qdrant.client.QdrantGrpcClient;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * RAG 装配：embedding 模型、向量库、检索器、增强器。
  *
- * <p>这里没有新增任何 Maven 依赖——embedding 走的仍是 OpenAI 兼容协议
- * （langchain4j-open-ai 同一个模块），内存向量库和检索组件都在 langchain4j 核心里。</p>
+ * <p>v0.2.1 起向量库从 JVM 内存换成 Qdrant（{@code langchain4j-qdrant} 模块），
+ * 换的只有 {@code embeddingStore} 这一个 bean；
+ * 检索器（{@code EmbeddingStoreContentRetriever}）、增强器（{@code DefaultRetrievalAugmentor}）不变，
+ * 因为它们面向的都是 {@code EmbeddingStore} 接口，这正是 v0.2 留好的替换点。
  */
 @Configuration
 @RequiredArgsConstructor
@@ -51,14 +57,31 @@ public class RagConfig {
     }
 
     /**
-     * 向量库：v0.2 用 JVM 内存实现，检索是把库里每个向量和问题向量挨个算相似度的精确扫描。
+     * Qdrant 客户端：存取向量（EmbeddingStore）和建库清点（QdrantCollectionAdmin）共用一个。
      *
-     * <p>零基础设施的教学取舍：全库就几首诗的量级，完全够用；
-     * 需要持久化和近似最近邻索引时，替换点就是这个 EmbeddingStore 接口。</p>
+     * <p>构造它只是准备好 gRPC 通道，不会真的连 Qdrant——连不上要到第一次调用才暴露，
+     * 所以"Qdrant 没起就启动应用"的错误出现在开机入库那一步，而不是这里。</p>
      */
     @Bean
-    public EmbeddingStore<TextSegment> embeddingStore() {
-        return new InMemoryEmbeddingStore<>();
+    public QdrantClient qdrantClient() {
+        AiProperties.Qdrant qdrant = properties.getRag().getQdrant();
+        QdrantGrpcClient.Builder grpcBuilder = QdrantGrpcClient
+                .newBuilder(qdrant.getHost(), qdrant.getPort(), qdrant.isUseTls());
+        if (StringUtils.hasText(qdrant.getApiKey())) {
+            grpcBuilder.withApiKey(qdrant.getApiKey());
+        }
+        return new QdrantClient(grpcBuilder.build());
+    }
+
+    /**
+     * 向量库：Qdrant 独立进程存储，重启不丢；检索走 HNSW 近似最近邻索引。
+     */
+    @Bean
+    public EmbeddingStore<TextSegment> embeddingStore(QdrantClient qdrantClient) {
+        return QdrantEmbeddingStore.builder()
+                .client(qdrantClient)
+                .collectionName(properties.getRag().getQdrant().getCollectionName())
+                .build();
     }
 
     /** 检索器：把用户问题向量化，去向量库捞最相近的几首诗。 */

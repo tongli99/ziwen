@@ -1,4 +1,4 @@
-# 字问的外部依赖：目前只有 Redis。
+# 字问的外部依赖：Redis（对话记忆）+ Qdrant（古诗向量库）。
 # 用法：docker compose up -d，然后 mvn spring-boot:run
 services:
   redis:
@@ -13,5 +13,20 @@ services:
     volumes:
       - ziwen-redis-data:/data
 
+  qdrant:
+    image: qdrant/qdrant:v1.19.2
+    container_name: ziwen-qdrant
+    ports:
+      # 两个端口分工不同，都要开：
+      # 6334 是 gRPC——LangChain4j 的客户端走这个（application.yml 里配的也是它）
+      # 6333 是 REST——留给浏览器打开 http://localhost:6333/dashboard 肉眼看向量库
+      - "6333:6333"
+      - "6334:6334"
+    restart: unless-stopped
+    volumes:
+      # 向量落盘：容器删了重建，已嵌入的向量还在，应用重启不会重嵌
+      - ziwen-qdrant-data:/qdrant/storage
+
 volumes:
   ziwen-redis-data:
+  ziwen-qdrant-data:

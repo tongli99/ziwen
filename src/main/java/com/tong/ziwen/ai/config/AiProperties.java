@@ -68,6 +68,34 @@ public class AiProperties {
     public static class Rag {
         /** 每次检索带回的匹配数目：太少容易漏，太多会稀释无关回答。 */
         private int maxResults = 3;
+
+        /** 向量库 Qdrant 连接参数（v0.2.1 起）。 */
+        @Valid
+        private Qdrant qdrant = new Qdrant();
+    }
+
+    /**
+     * Qdrant 连接参数。
+     *
+     * <p>LangChain4j 的 Qdrant 客户端走 gRPC（默认端口 6334）</p>
+     */
+    @Data
+    public static class Qdrant {
+        @NotBlank
+        private String host = "localhost";
+
+        /** gRPC 端口。本地 compose 用默认 6334；Qdrant Cloud 的地址端口固定 6334、必须 TLS。 */
+        private int port = 6334;
+
+        /** collection 名。类比"一张表"：一个 collection 存一套语料的向量。 */
+        @NotBlank
+        private String collectionName = "ziwen_poems";
+
+        /** 本地 compose 走明文 gRPC（false）；Qdrant Cloud 必须 true。 */
+        private boolean useTls = false;
+
+        /** API key：本地无鉴权的 Qdrant 留空即可，仅 Qdrant Cloud 需要。 */
+        private String apiKey = "";
     }
 
     @Data

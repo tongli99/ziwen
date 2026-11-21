@@ -1,0 +1,18 @@
+### 向量库 Qdrant（对应 tag v0.2.1）——亲眼看到"向量活过了重启"
+### 前置：docker compose up -d（起 Redis + Qdrant），mvn spring-boot:run 完成首次入库
+### 浏览器打开 http://localhost:6333/dashboard 可以图形化看 collection 和点
+
+@qdrant = http://localhost:6333
+
+### 1. 看 collection 列表：应有 ziwen_poems
+GET {{qdrant}}/collections
+
+### 2. 看 collection 详情：points_count=8、1024 维、Cosine
+GET {{qdrant}}/collections/ziwen_poems
+
+### 3. 重启应用后复查：points_count 仍是 8（应用日志同时打印"跳过嵌入"）
+GET {{qdrant}}/collections/ziwen_poems
+
+### 4. 改了 data/poems.json 里已有诗的文字后想强制重灌：先删 collection，
+###    再重启应用（开机入库发现空库，会重新嵌入全量）
+DELETE {{qdrant}}/collections/ziwen_poems

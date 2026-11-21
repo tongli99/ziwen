@@ -13,7 +13,7 @@
 
     <groupId>com.tong</groupId>
     <artifactId>ziwen</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
     <name>ziwen</name>
     <description>字问 —— 陪娃学习的 AI 替身（LangChain4j 教程系列配套项目）</description>
 
@@ -52,6 +52,12 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
+        </dependency>
+        <!-- 向量库持久化：Qdrant（v0.2.1 起）。
+             版本号由 langchain4j-bom 解析成配套的版本 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-qdrant</artifactId>
         </dependency>
         <!-- 对话记忆持久化：Redis -->
         <dependency>
