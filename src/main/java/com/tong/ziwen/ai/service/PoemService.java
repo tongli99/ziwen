@@ -67,7 +67,11 @@ public class PoemService {
     /**
      * 裸检索：问题向量化后去向量库捞最相近的几首诗，不调 chat 模型。
      *
-     * <p>排查 RAG 问题的第一站——"没答对"先看这里检索回了什么、得分多少，
+     * <p>“最相近的几首”是陷阱：向量检索永远返回最近的 K 个，哪怕库里根本没有
+     * 那首诗，也会照常回“最像的错诗”。所以这里用 {@code minScore} 把低分命中
+     * 拦在门外——被拦干净了，空结果才真正意味着“没查到”，拒答才有依据。</p>
+     *
+     * <p>排查 RAG 问题的第一站——“没答对”先看这里检索回了什么、得分多少，
      * 是检索没命中，还是生成出了问题。</p>
      */
     public List<PoemHit> search(String question) {
@@ -75,6 +79,7 @@ public class PoemService {
         EmbeddingSearchResult<TextSegment> result = embeddingStore.search(EmbeddingSearchRequest.builder()
                 .queryEmbedding(queryEmbedding)
                 .maxResults(properties.getRag().getMaxResults())
+                .minScore(properties.getRag().getMinScore())
                 .build());
         return result.matches().stream()
                 .map(PoemHit::from)

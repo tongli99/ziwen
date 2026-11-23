@@ -23,8 +23,9 @@ import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 class PoemSearchToolTest {
 
     /**
-     * 与 PoemServiceTest 同款假 embedding 模型：文本含"瀑布"嵌成 [1,0]，其余 [0,1]，
-     * 让"问瀑布命中瀑布诗"可以离线断言。
+     * 假 embedding 模型，两维就够：文本含"瀑布"嵌成 [1,0]，其余 [0,1]。
+     * PoemServiceTest 那台是三维的（多一支"语料里没有的诗"，好测 minScore 阈值），
+     * 这里只断言"问瀑布命中瀑布诗"，用不上第三维。
      */
     private final EmbeddingModel waterfallFakeModel = new EmbeddingModel() {
         @Override
@@ -64,5 +65,34 @@ class PoemSearchToolTest {
         PoemSearchTool tool = new PoemSearchTool(emptyStoreService);
 
         assertThat(tool.searchPoems("写瀑布的诗")).contains("没查到");
+    }
+
+    @Test
+    void blankOrBlankishQueryGetsNotFoundInsteadOfARetrieval() {
+        // 空白检索词不值得向量化一趟：老实回"没查到"，不猜模型想查什么。
+        // 假模型被调即抛异常——只有短路真的发生（没走向量化）测试才绿；
+        // 若退化成"空库检索也回没查到"，两条路径同一个输出，断言就白写了
+        EmbeddingModel neverCalledModel = new EmbeddingModel() {
+            @Override
+            public Response<List<Embedding>> embedAll(List<TextSegment> segments) {
+                throw new AssertionError("空白检索词不该走到向量化");
+            }
+        };
+        PoemService poemService = new PoemService(
+                new ObjectMapper(), neverCalledModel, new InMemoryEmbeddingStore<>(), new AiProperties());
+        PoemSearchTool tool = new PoemSearchTool(poemService);
+
+        assertThat(tool.searchPoems("  ")).contains("没查到");
+    }
+
+    @Test
+    void sanitizeDefendsAgainstUntrustedToolInput() {
+        // 模型给的入参不是代码变量，是另一次生成的输出：空、多行夹带、超长都要拦
+        assertThat(PoemSearchTool.sanitize(null)).isEmpty();
+        assertThat(PoemSearchTool.sanitize("   ")).isEmpty();
+        // 多行文本（可能是夹带的指令）压平成单个短语
+        assertThat(PoemSearchTool.sanitize("李白\n\n望庐山瀑布")).isEqualTo("李白 望庐山瀑布");
+        // 超长截断：正常检索词不过几十字，长到超限说明塞了别的东西
+        assertThat(PoemSearchTool.sanitize("瀑布".repeat(60))).hasSize(50);
     }
 }

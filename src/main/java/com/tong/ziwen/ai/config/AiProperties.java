@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -32,7 +34,10 @@ public class AiProperties {
     /** 多轮对话记忆配置 */
     private Memory memory = new Memory();
 
-    /** RAG 检索配置 */
+    /**
+     * RAG 检索配置。
+     */
+    @Valid
     private Rag rag = new Rag();
 
     /** 对话模型连接与采样参数（base-url 指向任意 OpenAI 兼容端点）。 */
@@ -68,6 +73,14 @@ public class AiProperties {
     public static class Rag {
         /** 每次检索带回的匹配数目：太少容易漏，太多会稀释无关回答。 */
         private int maxResults = 3;
+
+        /**
+         * 相似度阈值：低于它的命中一律丢弃，剩下的才会作为“查到了”。取值限定在
+         * [0,1]（RelevanceScore 尺度），越界由 {@code @DecimalMin}/{@code @DecimalMax} 启动即拦截。
+         */
+        @DecimalMin("0.0")
+        @DecimalMax("1.0")
+        private double minScore = 0.78;
 
         /** 向量库 Qdrant 连接参数（v0.2.1 起）。 */
         @Valid
