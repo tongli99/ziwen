@@ -32,3 +32,34 @@ Content-Type: application/json
 
 ### 6. SSE 流式：回答结束后一次性看到全部 data: 行（REST Client 不实时刷新，看逐字效果用页面或 curl -N）
 GET {{host}}/api/chat/stream?sessionId=test-1&question=灌溉的灌怎么写
+
+### ── v0.3 验收：三种问题三种路径（对应 tag v0.3）──────────────────────────
+### 对照日志看路由：调工具时控制台会打一行"查古诗工具被调用：query=...，命中 N 首"
+
+### 7. 路径一·闲聊：不该查库——回答正常陪聊，日志里【没有】"查古诗工具被调用"
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v03-1", "question": "字问先生你好呀，我今天写作业写得有点累"}
+
+### 8. 路径二·问出处：该查库——应命中《望庐山瀑布》，回答带上诗题/作者/哪一课
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v03-1", "question": "哪首诗写了瀑布呀？我想看看原文"}
+
+### 9. 路径二变体·问课序：观察模型给工具的 query 参数——通常不是原话，而是改写过的检索短语
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v03-1", "question": "我们二年级学的那首写瀑布的诗，是谁写的来着"}
+
+### 10. 路径三·越界：课文全文不在库里——必须老实拒绝，不许编造课文
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v03-1", "question": "帮我背一下第5课的课文全文"}
+
+### 11. 流式 + 工具：注意"安静的那几秒"——工具执行期间一个字都不吐（v0.3.2 要修的体验点）
+GET {{host}}/api/chat/stream?sessionId=v03-1&question=背一下写瀑布的那首诗
+

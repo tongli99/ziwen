@@ -6,13 +6,7 @@ import org.springframework.util.StringUtils;
 
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.input.PromptTemplate;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
-import dev.langchain4j.rag.DefaultRetrievalAugmentor;
-import dev.langchain4j.rag.RetrievalAugmentor;
-import dev.langchain4j.rag.content.injector.DefaultContentInjector;
-import dev.langchain4j.rag.content.retriever.ContentRetriever;
-import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import io.qdrant.client.QdrantClient;
@@ -20,26 +14,16 @@ import io.qdrant.client.QdrantGrpcClient;
 import lombok.RequiredArgsConstructor;
 
 /**
- * RAG 装配：embedding 模型、向量库、检索器、增强器。
+ * RAG 底座装配：embedding 模型 + Qdrant 向量库。
  *
- * <p>v0.2.1 起向量库从 JVM 内存换成 Qdrant（{@code langchain4j-qdrant} 模块），
- * 换的只有 {@code embeddingStore} 这一个 bean；
- * 检索器（{@code EmbeddingStoreContentRetriever}）、增强器（{@code DefaultRetrievalAugmentor}）不变，
- * 因为它们面向的都是 {@code EmbeddingStore} 接口，这正是 v0.2 留好的替换点。
+ * <p>v0.2 的固定检索管线（{@code EmbeddingStoreContentRetriever} +
+ * {@code DefaultRetrievalAugmentor}，每轮对话先检索、把资料拼进消息）在 v0.3 退役：
+ * 检索改由模型按需调用 {@code PoemSearchTool} 触发。底座不变——工具走的仍是这里
+ * 装配的同一个 {@code embeddingStore}，换的是编排方式，不是检索能力。</p>
  */
 @Configuration
 @RequiredArgsConstructor
 public class RagConfig {
-
-    /**
-     * 检索结果注入 prompt 的模板：必须包含 {{userMessage}} 和 {{contents}} 两个占位符。
-     * 框架默认模板是英文（"Answer using the following information..."），给娃的产品换成中文。
-     */
-    private static final String CONTENT_TEMPLATE = """
-            {{userMessage}}
-
-            下面是从古诗书里查到的资料，回答古诗问题以查到的诗为准：
-            {{contents}}""";
 
     private final AiProperties properties;
 
@@ -81,28 +65,6 @@ public class RagConfig {
         return QdrantEmbeddingStore.builder()
                 .client(qdrantClient)
                 .collectionName(properties.getRag().getQdrant().getCollectionName())
-                .build();
-    }
-
-    /** 检索器：把用户问题向量化，去向量库捞最相近的几首诗。 */
-    @Bean
-    public ContentRetriever contentRetriever(EmbeddingStore<TextSegment> embeddingStore,
-                                             EmbeddingModel embeddingModel) {
-        return EmbeddingStoreContentRetriever.builder()
-                .embeddingStore(embeddingStore)
-                .embeddingModel(embeddingModel)
-                .maxResults(properties.getRag().getMaxResults())
-                .build();
-    }
-
-    /** 增强器：声明式 RAG 的总入口——每轮对话先检索，再把结果按模板拼进这条用户消息。 */
-    @Bean
-    public RetrievalAugmentor retrievalAugmentor(ContentRetriever contentRetriever) {
-        return DefaultRetrievalAugmentor.builder()
-                .contentRetriever(contentRetriever)
-                .contentInjector(DefaultContentInjector.builder()
-                        .promptTemplate(PromptTemplate.from(CONTENT_TEMPLATE))
-                        .build())
                 .build();
     }
 }

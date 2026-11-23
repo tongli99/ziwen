@@ -13,7 +13,7 @@
 
     <groupId>com.tong</groupId>
     <artifactId>ziwen</artifactId>
-    <version>0.2.1</version>
+    <version>0.3</version>
     <name>ziwen</name>
     <description>字问 —— 陪娃学习的 AI 替身（LangChain4j 教程系列配套项目）</description>
 

@@ -5,13 +5,13 @@ import java.nio.charset.StandardCharsets;
 
 import com.tong.ziwen.ai.store.RedisChatMemoryStore;
 import com.tong.ziwen.ai.service.Companion;
+import com.tong.ziwen.ai.tool.PoemSearchTool;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
-import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -72,21 +72,22 @@ public class AiConfig {
     /**
      * "伴读爸爸妈妈"：AiServices 动态代理，人设由 system prompt 定义，记忆按会话隔离。
      *
-     * <p>v0.2 起挂上 {@code retrievalAugmentor}：每轮对话先把用户问题拿去检索古诗库，
-     * 命中的诗直接拼进这条消息再交给模型——对话代码因此一行不用改。</p>
+     * <p>v0.3 起编排方式变了：v0.2 的 {@code retrievalAugmentor}（每轮固定先检索）
+     * 换成 {@code tools} 挂上 {@link PoemSearchTool}——什么时候检索由模型在对话中
+     * 自己决定。ChatController 和 Companion 接口因此一行不用改。</p>
      */
     @Bean
     public Companion companion(ChatModel chatModel,
                            StreamingChatModel streamingChatModel,
                            ChatMemoryProvider chatMemoryProvider,
-                           RetrievalAugmentor retrievalAugmentor) {
+                           PoemSearchTool poemSearchTool) {
         String systemPrompt = readSystemPrompt();
         return AiServices.builder(Companion.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(chatMemoryProvider)
                 .systemMessageProvider(memoryId -> systemPrompt)
-                .retrievalAugmentor(retrievalAugmentor)
+                .tools(poemSearchTool)
                 .build();
     }
 
