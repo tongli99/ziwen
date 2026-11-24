@@ -40,6 +40,12 @@ public class AiProperties {
     @Valid
     private Rag rag = new Rag();
 
+    /**
+     * 工具循环护栏配置（v0.3.2 起）。
+     */
+    @Valid
+    private Tool tool = new Tool();
+
     /** 对话模型连接与采样参数（base-url 指向任意 OpenAI 兼容端点）。 */
     @Data
     public static class Chat {
@@ -113,16 +119,32 @@ public class AiProperties {
 
     @Data
     public static class Memory {
-        /** 每个会话保留的最大消息条数 */
-        private int maxMessages = 20;
+        /**
+         * 每个会话保留的最大消息条数。带工具的一轮对话占 4 条（问题、工具调用请求、
+         * 工具返回结果、回答），v0.3.2 起放宽到 30：窗口越大保留的上下文越多，
+         * 代价是每轮请求重发的 token 也越多。
+         */
+        private int maxMessages = 30;
 
         /** Redis key 前缀，完整 key = 前缀 + sessionId，统一前缀方便按业务清点/清理。 */
         private String keyPrefix = "ziwen:chat:memory:";
 
         /**
-         * 会话记忆的存活时间：滑动过期——每轮对话写回时刷新，长期不聊的会话自动清理。
+         * 会话记忆的存活时间：滑动过期，每轮对话写回时刷新，长期不活跃的会话自动清理。
          */
         @DurationUnit(ChronoUnit.DAYS)
         private Duration ttl = Duration.ofDays(7);
+    }
+
+    /**
+     * Agentic 工具护栏（v0.3.2 起）：软限制（返回劝停文本）与硬限制（框架层异常终止）两级防护。
+     */
+    @Data
+    public static class Tool {
+        /** 单轮对话内允许的工具调用次数上限：超出后返回劝停文本，引导模型正常结束本轮对话而非抛出异常。 */
+        private int maxCallsPerTurn = 3;
+
+        /** 框架层兜底（AiServices 的 maxToolCallingRoundTrips）：单轮中带工具调用的回复轮数超过该值即抛出异常，终止本轮。 */
+        private int maxRoundTrips = 10;
     }
 }

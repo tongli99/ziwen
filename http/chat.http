@@ -60,6 +60,23 @@ Content-Type: application/json
 
 {"sessionId": "v03-1", "question": "帮我背一下第5课的课文全文"}
 
-### 11. 流式 + 工具：注意"安静的那几秒"——工具执行期间一个字都不吐（v0.3.2 要修的体验点）
+### 11. 流式 + 工具：v0.3.2 前要注意"安静的那几秒"；现在那几秒会先推一行 event: status 状态
 GET {{host}}/api/chat/stream?sessionId=v03-1&question=背一下写瀑布的那首诗
+
+### ── v0.3.2 验收：护栏与可观测（对应 tag v0.3.2）──────────────────────────
+### 判据看日志：工具调用一行 tool=searchPoems | sessionId=... | query=... | hits=... | elapsedMs=...，
+### 被限次拦下则是 tool=... | sessionId=... | arguments=... | blocked=true
+
+### 12. 双问题一轮两查：正常放行（默认上限 3 次），日志连出两行，sessionId 相同
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v032-1", "question": "写瀑布的诗和写梅花的诗各是哪首呀"}
+
+### 13. 流式状态事件：REST Client 不实时刷新，逐事件效果用 curl -N {{host}}/api/chat/stream?sessionId=v032-1&question=背一下写瀑布的那首诗
+### 工具执行前应看到一行 event: status + data: 字问先生正在翻古诗书…，之后才是逐 token 的默认事件
+GET {{host}}/api/chat/stream?sessionId=v032-1&question=背一下写瀑布的那首诗
+
+### 14. 劝停触发实验：把 application.yml 的 ai.tool.max-calls-per-turn 临时改成 1，重启后再发 12 号请求
+### 预期：第一次调用正常放行，第二次日志出现 blocked=true，模型收到劝停文本后应收尾作答而不是报错；测完改回 3
 

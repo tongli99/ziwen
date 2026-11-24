@@ -65,6 +65,8 @@
       background: #f5efe3; color: #4a3b2a; padding: 8px 12px;
       border-radius: 12px 12px 12px 2px; display: inline-block;
     }
+    /* 工具状态行（"字问先生正在翻古诗书…"）：回答的第一个 token 一到就撤 */
+    .status { text-align: center; font-size: 12px; color: #b0a695; margin: 6px 0; }
     form { display: flex; gap: 8px; margin-top: 12px; }
     input {
       flex: 1; padding: 12px 14px; border: 1px solid #ddd2c2;
@@ -243,6 +245,7 @@
 
   function renderChat() {
     chat.innerHTML = '';
+    statusLine = null; // 状态行是临时元素，随聊天区一起清掉，别留悬空引用
     for (const message of getMessages(activeSessionId)) {
       bubble(message.role, message.text);
     }
@@ -282,6 +285,7 @@
     if (!activeStream) return;
     const sessionId = activeStream.sessionId;
     activeStream = null;
+    hideStatus();
     saveMessages(sessionId);
     send.disabled = false;
     input.focus();
@@ -292,6 +296,26 @@
     if (!activeStream || activeStream.sessionId !== activeSessionId) return;
     const lastBubble = chat.lastElementChild;
     if (lastBubble) lastBubble.firstElementChild.textContent = activeStream.message.text;
+  }
+
+  // ===== 工具状态行：SSE 具名 status 事件（"字问先生正在翻古诗书…"） =====
+  // 工具执行期间一个 token 都不吐，这行字就是那几秒白屏里唯一的动静；
+  // 回答的第一个 token 一到就撤，不需要"查完了"事件
+  let statusLine = null;
+
+  function showStatus(text) {
+    if (!activeStream || activeStream.sessionId !== activeSessionId) return;
+    if (!statusLine) {
+      statusLine = document.createElement('div');
+      statusLine.className = 'status';
+      chat.appendChild(statusLine);
+    }
+    statusLine.textContent = text;
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function hideStatus() {
+    if (statusLine) { statusLine.remove(); statusLine = null; }
   }
 
   form.addEventListener('submit', (e) => {
@@ -318,10 +342,13 @@
     activeStream = { es, sessionId: activeSessionId, message: aiMessage };
 
     es.onmessage = (ev) => {
+      hideStatus(); // token 一到，状态行的使命就结束了
       aiMessage.text += ev.data;
       updateLiveBubble();
       chat.scrollTop = chat.scrollHeight;
     };
+    // 工具状态是具名事件，和逐 token 的默认事件分流（EventSource 按事件名分派）
+    es.addEventListener('status', (ev) => showStatus(ev.data));
     // 连接关闭（正常结束也走这里）都会触发 onerror，兜底提示
     es.onerror = () => {
       es.close();

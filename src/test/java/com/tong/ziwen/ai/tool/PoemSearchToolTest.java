@@ -46,7 +46,7 @@ class PoemSearchToolTest {
         store.addAll(waterfallFakeModel.embedAll(segments).content(), segments);
         PoemSearchTool tool = new PoemSearchTool(poemService);
 
-        String result = tool.searchPoems("二年级那首写瀑布的诗");
+        String result = tool.searchPoems("二年级那首写瀑布的诗", "test-session");
 
         // 模型拿到的是"出处 + 原文 + 相似度"，信息够它答完自然带上引用
         assertThat(result)
@@ -64,7 +64,7 @@ class PoemSearchToolTest {
                 new ObjectMapper(), waterfallFakeModel, new InMemoryEmbeddingStore<>(), new AiProperties());
         PoemSearchTool tool = new PoemSearchTool(emptyStoreService);
 
-        assertThat(tool.searchPoems("写瀑布的诗")).contains("没查到");
+        assertThat(tool.searchPoems("写瀑布的诗", "test-session")).contains("没查到");
     }
 
     @Test
@@ -82,7 +82,7 @@ class PoemSearchToolTest {
                 new ObjectMapper(), neverCalledModel, new InMemoryEmbeddingStore<>(), new AiProperties());
         PoemSearchTool tool = new PoemSearchTool(poemService);
 
-        assertThat(tool.searchPoems("  ")).contains("没查到");
+        assertThat(tool.searchPoems("  ", "test-session")).contains("没查到");
     }
 
     @Test

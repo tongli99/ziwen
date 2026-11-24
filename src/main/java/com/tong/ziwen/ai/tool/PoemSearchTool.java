@@ -8,6 +8,7 @@ import com.tong.ziwen.ai.dto.PoemHit;
 import com.tong.ziwen.ai.service.PoemService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
+import dev.langchain4j.agent.tool.ToolMemoryId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,6 +23,9 @@ import lombok.extern.slf4j.Slf4j;
  * <p>入参防御是 v0.3.1 的主角：模型的输出不是代码，是另一个模型的输入——
  * query 可能空、可能长到塞进一整段指令、可能夹带多行文本。工具层是边界，
  * 进门先检查，检索层拿到的永远是“一个干净的短语”。</p>
+ *
+ * <p>v0.3.2 起多了一个 {@code @ToolMemoryId} 参数：框架注入会话 id，
+ * 且不进给模型看的说明书——日志里 sessionId 字段的来源。</p>
  */
 @Slf4j
 @Component
@@ -41,16 +45,15 @@ public class PoemSearchTool {
     @Tool("在古诗书里检索古诗。孩子问到具体某首诗时调用：背不全想确认原文、问哪首诗写了什么、"
             + "问作者是谁、问是几年级哪一课学的。参数给适合检索的短语，如\"写瀑布的诗\"\"李白 望庐山瀑布\"。"
             + "闲聊、问生字怎么写、问词语意思，不要调用。")
-    public String searchPoems(@P("检索古诗书用的关键词或问题，如\"写瀑布的诗\"") String query) {
+    public String searchPoems(@P("检索古诗书用的关键词或问题，如\"写瀑布的诗\"") String query,
+                              @ToolMemoryId String sessionId) {
         long startedAt = System.currentTimeMillis();
         String sanitized = sanitize(query);
         // 空检索词不值得向量化一趟：直接当 0 命中处理，老实回"没查到"，不猜模型想查什么
         List<PoemHit> hits = sanitized.isEmpty() ? List.of() : poemService.search(sanitized);
-        // 每次工具调用一行结构化日志：工具名/参数/命中数/耗时——v0.6b 评测数据的地基。
-        // 字段竖线分隔而不是塞进自然语句：后续拿正则/脚本扫这行日志就是一条评测记录
-        //（sessionId 工具这层还拿不到会话 id，等后面拿得到了再补，先欠着）
-        log.info("tool=searchPoems | query=\"{}\" | hits={} | elapsedMs={}",
-                sanitized, hits.size(), System.currentTimeMillis() - startedAt);
+        // 每次工具调用一行结构化日志：sessionId 由 @ToolMemoryId 注入
+        log.info("tool=searchPoems | sessionId={} | query=\"{}\" | hits={} | elapsedMs={}",
+                sessionId, sanitized, hits.size(), System.currentTimeMillis() - startedAt);
         if (sanitized.isEmpty()) {
             return "检索词是空的，没查到古诗。";
         }

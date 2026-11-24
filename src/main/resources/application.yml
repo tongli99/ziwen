@@ -44,9 +44,14 @@ ai:
       api-key: ${AI_QDRANT_API_KEY:}   #本地 compose 无鉴权留空；Qdrant Cloud 才需要
   # 多轮对话记忆（窗口策略 + Redis 存储）
   memory:
-    max-messages: 20   #每个会话保留的最大消息条数
+    # 一轮带工具的对话占 4 条（问题、申请单、回执、回答），20 条存不下几轮，v0.3.2 起放宽到 30
+    max-messages: 30
     key-prefix: "ziwen:chat:memory:"   #完整 key = 前缀 + sessionId
     ttl: 7d           #滑动过期：每轮对话后刷新，连续 7 天不聊的会话自动清理
+  # 工具循环护栏（v0.3.2 起）：软闸劝停 + 硬保险丝
+  tool:
+    max-calls-per-turn: 3   #单轮内工具调用上限，超出回劝停文本
+    max-round-trips: 10     #框架层保险丝（默认 100），超限整轮异常终止
 
 logging:
   level:
