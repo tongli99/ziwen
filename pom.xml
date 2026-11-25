@@ -13,7 +13,7 @@
 
     <groupId>com.tong</groupId>
     <artifactId>ziwen</artifactId>
-    <version>0.3.2</version>
+    <version>0.4</version>
     <name>ziwen</name>
     <description>字问 —— 陪娃学习的 AI 替身（LangChain4j 教程系列配套项目）</description>
 
@@ -63,6 +63,18 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- 生字表持久化：SQLite（v0.4 起）。嵌入式单文件库：驱动自带引擎，
+             无需安装、无服务器进程；JdbcTemplate 由 spring-boot-starter-jdbc 提供，
+             sqlite-jdbc 的版本号由本项目自管（Boot 父 POM 未收录） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.50.3.0</version>
         </dependency>
 
         <dependency>

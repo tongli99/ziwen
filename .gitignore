@@ -1,6 +1,8 @@
 target/
 *.class
 *.log
+# SQLite 生字表库文件（v0.4 起）：启动时由 schema.sql / data.sql 自动生成
+*.sqlite.db
 .idea/
 *.iml
 .vscode/

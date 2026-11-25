@@ -80,3 +80,38 @@ GET {{host}}/api/chat/stream?sessionId=v032-1&question=背一下写瀑布的那�
 ### 14. 劝停触发实验：把 application.yml 的 ai.tool.max-calls-per-turn 临时改成 1，重启后再发 12 号请求
 ### 预期：第一次调用正常放行，第二次日志出现 blocked=true，模型收到劝停文本后应收尾作答而不是报错；测完改回 3
 
+### ── v0.4 验收：生字表结构化查询（对应 tag v0.4）──────────────────────────
+### 判据看日志：工具调用一行 tool=findLessonsByHanzi | sessionId=... | hanzi=... | hits=... | elapsedMs=...
+### 或 tool=listCharsByLesson | sessionId=... | lessonNo=... | hits=... | elapsedMs=...
+### SQLite 库文件 ziwen.sqlite.db 由首次启动自动生成，不入 git
+
+### 15. 查字→课：问"灌字哪课学的"——应命中第 2 课 P6，回答带上课序页码
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v04-1", "question": "灌字是哪一课学的呀"}
+
+### 16. 同字多课：问"底"——第 3、4 课都学了它，回答应两处都报，不能只说一个
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v04-1", "question": "底字是哪一课学的"}
+
+### 17. 按课列字：要预习字表——第 3 课 15 个字应列全，带拼音笔画偏旁
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v04-1", "question": "第 3 课要预习哪些生字呀"}
+
+### 18. 库外字：表里没有的字——必须老实说没有，不许编课序
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v04-1", "question": "囧字是哪一课学的"}
+
+### 19. 路由对比：同一句里既问古诗又问生字——两个工具都该被调，各查各的
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{"sessionId": "v04-1", "question": "背一下写瀑布的那首诗，再告诉我灌字是哪课学的"}
+

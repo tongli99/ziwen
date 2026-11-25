@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.tong.ziwen.ai.service.Companion;
 import com.tong.ziwen.ai.store.RedisChatMemoryStore;
+import com.tong.ziwen.ai.tool.HanziTool;
 import com.tong.ziwen.ai.tool.PoemSearchTool;
 import com.tong.ziwen.ai.tool.ToolCallLimiter;
 import com.tong.ziwen.ai.tool.ToolGuardrailExecutor;
@@ -79,7 +80,7 @@ public class AiConfig {
     }
 
     /**
-     * "伴读爸爸妈妈"人设：AiServices 动态代理，人设由 system prompt 定义，记忆按会话隔离。
+     * “伴读爸爸妈妈”人设：AiServices 动态代理，人设由 system prompt 定义，记忆按会话隔离。
      *
      * <p>v0.3 起编排方式变更：v0.2 的 {@code retrievalAugmentor}（每轮固定先检索）
      * 改为 {@code tools} 挂载 {@link PoemSearchTool}，是否检索由模型在对话中自行决定。
@@ -87,12 +88,16 @@ public class AiConfig {
      *
      * <p>v0.3.2 起工具经 {@link ToolGuardrailExecutor} 包装后再挂载（调用限次、状态推送），
      * {@code maxToolCallingRoundTrips} 同步收紧为配置值，作为模型无视劝停文本时的最后防线。</p>
+     *
+     * <p>v0.4 起 {@link HanziTool} 的两个生字表查询加入挂载：古诗语义检索与
+     * 生字结构化查询两套检索并存，路由由模型按各工具的说明书自行决定。</p>
      */
     @Bean
     public Companion companion(ChatModel chatModel,
                            StreamingChatModel streamingChatModel,
                            ChatMemoryProvider chatMemoryProvider,
                            PoemSearchTool poemSearchTool,
+                           HanziTool hanziTool,
                            ToolCallLimiter toolCallLimiter,
                            ToolStatusHub toolStatusHub) {
         String systemPrompt = readSystemPrompt();
@@ -101,38 +106,60 @@ public class AiConfig {
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(chatMemoryProvider)
                 .systemMessageProvider(memoryId -> systemPrompt)
-                .tools(poemSearchToolWithGuardrails(poemSearchTool, toolCallLimiter, toolStatusHub))
+                .tools(toolsWithGuardrails(poemSearchTool, hanziTool, toolCallLimiter, toolStatusHub))
                 .maxToolCallingRoundTrips(properties.getTool().getMaxRoundTrips())
                 .build();
     }
 
     /**
-     * 将古诗工具包上护栏后交给 AiServices：工具描述仍从 {@code @Tool} 注解反射生成
-     * （{@code @ToolMemoryId} 参数不进入描述），执行链从直接调用方法变为"护栏 → 方法"。
+     * 全部工具包上护栏后交给 AiServices（v0.4 起共三个：古诗语义检索、
+     * 查字→课、按课列字）。工具描述仍从 {@code @Tool} 注解反射生成
+     * （{@code @ToolMemoryId} 参数不进描述），执行链从直接调用方法变为“护栏 → 方法”。
      * 方法签名变更时此处启动即抛出异常，异常消息带有定位提示。
      */
-    private List<AiServiceTool> poemSearchToolWithGuardrails(PoemSearchTool poemSearchTool,
-                                                             ToolCallLimiter toolCallLimiter,
-                                                             ToolStatusHub toolStatusHub) {
+    private List<AiServiceTool> toolsWithGuardrails(PoemSearchTool poemSearchTool,
+                                                    HanziTool hanziTool,
+                                                    ToolCallLimiter toolCallLimiter,
+                                                    ToolStatusHub toolStatusHub) {
+        return List.of(
+                guardTool(poemSearchTool, "searchPoems",
+                        new Class<?>[] {String.class, String.class},
+                        "字问先生正在翻古诗书…", toolCallLimiter, toolStatusHub),
+                guardTool(hanziTool, "findLessonsByHanzi",
+                        new Class<?>[] {String.class, String.class},
+                        "字问先生正在翻生字表…", toolCallLimiter, toolStatusHub),
+                guardTool(hanziTool, "listCharsByLesson",
+                        new Class<?>[] {int.class, String.class},
+                        "字问先生正在整理预习字表…", toolCallLimiter, toolStatusHub));
+    }
+
+    /**
+     * 单个 {@code @Tool} 方法的护栏装配：反射拿到 Method 后手工复刻框架的注册流程——
+     * 说明书交给 {@code toolSpecificationFrom} 从注解生成，执行器由
+     * {@code DefaultToolExecutor.builder} 反射调用方法，再包一层护栏。护栏不是
+     * Spring bean（状态文案因工具而异，每个工具现场 new 一个），不能换成注入单例。
+     */
+    private AiServiceTool guardTool(Object toolBean, String methodName, Class<?>[] parameterTypes,
+                                    String workingStatusText, ToolCallLimiter toolCallLimiter,
+                                    ToolStatusHub toolStatusHub) {
         try {
-            Method searchPoems = PoemSearchTool.class.getMethod("searchPoems", String.class, String.class);
+            Method toolMethod = toolBean.getClass().getMethod(methodName, parameterTypes);
             // 按照框架 .tools(对象) 的内部注册方式创建方法执行器，异常处理开关与框架默认保持一致
             ToolExecutor plainExecutor = DefaultToolExecutor.builder()
-                    .object(poemSearchTool)
-                    .originalMethod(searchPoems)
-                    .methodToInvoke(searchPoems)
+                    .object(toolBean)
+                    .originalMethod(toolMethod)
+                    .methodToInvoke(toolMethod)
                     .wrapToolArgumentsExceptions(true)
                     .propagateToolExecutionExceptions(true)
                     .build();
-            ToolExecutor guardedExecutor = new ToolGuardrailExecutor(
-                    plainExecutor, "字问先生正在翻古诗书…", toolCallLimiter, toolStatusHub);
-            return List.of(AiServiceTool.builder()
-                    .toolSpecification(toolSpecificationFrom(searchPoems))
-                    .toolExecutor(guardedExecutor)
-                    .build());
+            return AiServiceTool.builder()
+                    .toolSpecification(toolSpecificationFrom(toolMethod))
+                    .toolExecutor(new ToolGuardrailExecutor(
+                            plainExecutor, workingStatusText, toolCallLimiter, toolStatusHub))
+                    .build();
         } catch (NoSuchMethodException e) {
-            throw new IllegalStateException(
-                    "装配古诗工具失败：searchPoems 的方法签名变了吗？记得同步这里", e);
+            throw new IllegalStateException("装配工具失败：%s 的 %s 方法签名变了吗？记得同步这里"
+                    .formatted(toolBean.getClass().getSimpleName(), methodName), e);
         }
     }
 

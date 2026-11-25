@@ -4,9 +4,9 @@
 
 陪娃写作业的 AI 伴读——"字问先生"像爸妈一样耐心。
 
-这是 **LangChain4j 中文入门教程系列的配套项目**：一篇教程 = 一个产品能力 = 一个 git tag，`git checkout` 对应版本即可跟着写。当前版本 **v0.3.2**。
+这是 **LangChain4j 中文入门教程系列的配套项目**：一篇教程 = 一个产品能力 = 一个 git tag，`git checkout` 对应版本即可跟着写。当前版本 **v0.4**。
 
-## 当前版本能做什么（v0.3.2）
+## 当前版本能做什么（v0.4）
 
 | 能力 | 说明 |
 |---|---|
@@ -20,6 +20,7 @@
 | 不硬编 | 拒答有阈值兜底：相似度低于 ai.rag.min-score 的命中直接丢，书里没有的诗老实说"没有"，不拿最像的一首顶上 |
 | 有刹车 | 工具循环护栏：单轮调用超过 ai.tool.max-calls-per-turn 次回劝停文本，模型拿已查到的结果收尾而不是报错；框架保险丝同步收紧（100 圈 → 10 圈） |
 | 不干等 | 工具执行的白屏期有动静：SSE 具名 status 事件推"字问先生正在翻古诗书…"，首个 token 一到自动撤掉 |
+| 懂生字 | 生字表结构化查询：问"灌字哪课学的"秒答第几课第几页，要"第 2 课预习字表"按课列出——向量答不了的精确事实，走 SQLite 白名单查询 |
 
 ## 演进路线
 
@@ -31,8 +32,8 @@
 | v0.2.1 | 向量库落 Qdrant（重启不重嵌入） | ✅ |
 | v0.3 | Agentic RAG（@Tool、该查才查、拒答） | ✅ |
 | v0.3.1 | 拒答做硬（相似度阈值、工具入参防御、结构化日志） | ✅ |
-| v0.3.2 | 工具循环护栏（软闸限次、保险丝收紧、status 状态推送、记忆窗口放宽到 30 条） | ✅ 当前 |
-| v0.4 | 生字表结构化查询 | ⬜ |
+| v0.3.2 | 工具循环护栏（软闸限次、保险丝收紧、status 状态推送、记忆窗口放宽到 30 条） | ✅ |
+| v0.4 | 生字表结构化查询（SQLite、只读白名单查询、"字→课"与"课→字表"两个工具） | ✅ 当前 |
 | v0.5 | 多 Agent 路由 + 多用户记忆隔离 | ⬜ |
 | v0.6 | 听写模式、错词本、评测、一键部署 | ⬜ |
 
@@ -52,7 +53,9 @@ export AI_EMBEDDING_MODEL=text-embedding-v3
 # 2. 起外部依赖：Redis（对话记忆）+ Qdrant（古诗向量库，v0.2.1 起）
 docker compose up -d
 
-# 3. 启动（首次会把 data/poems.json 向量化写入 Qdrant；之后重启日志显示"跳过嵌入"，不再重嵌）
+# 3. 启动（首次会把 data/poems.json 向量化写入 Qdrant，之后重启日志显示"跳过嵌入"，不再重嵌；
+#    生字表在 SQLite 单文件库里，无需容器，首次启动自动建库 ziwen.sqlite.db 并灌入种子数据；
+#    种子只录了二年级上前 4 课，换自家课本在 src/main/resources/data.sql 补录即可）
 mvn spring-boot:run
 ```
 
@@ -62,6 +65,8 @@ mvn spring-boot:run
 你：二年级那首写瀑布的诗，背给我听？
 AI：《望庐山瀑布》，李白写的，你们二年级上第 8 课学的——
     日照香炉生紫烟，遥看瀑布挂前川。飞流直下三千尺，疑是银河落九天。
+你："灌"字是哪一课学的？
+AI：第 2 课《我是什么》学的，在第 6 页——灌，guàn，20 画，三点水旁。
 你：帮我背一下《将进酒》
 AI：我的古诗书里还没有这首哦。
 ```
@@ -72,7 +77,8 @@ AI：我的古诗书里还没有这首哦。
 |---|---|
 | `GET /` | 内置聊天页面 |
 | `POST /api/chat` | 同步问答，body：`{"sessionId": "...", "question": "..."}` |
-| `GET /api/chat/stream?sessionId=...&question=...` | SSE 流式问答，逐 token 推送；检索期间另推具名 status 事件 |
+| `GET /api/chat/stream?sessionId=...&question=...` | SSE 流式问答，逐 token 推送；工具执行期间另推具名 status 事件 |
+| `DELETE /api/chat/{sessionId}` | 清空该会话的对话记忆（从 Redis 删） |
 | `GET /api/poems` | 古诗库全量列表 |
 | `GET /api/poems/search?question=...` | 裸检索：不调 chat 模型，返回命中的古诗 + 相似度得分；低于 `ai.rag.min-score` 的命中被过滤，空结果即"书里没有" |
 
@@ -80,7 +86,7 @@ AI：我的古诗书里还没有这首哦。
 
 ## 技术栈
 
-Java 21 · Spring Boot 3.5 · LangChain4j 1.19 · Redis（对话记忆） · Qdrant（古诗向量库） · 通义千问 embedding · Maven。
+Java 21 · Spring Boot 3.5 · LangChain4j 1.19 · Redis（对话记忆） · Qdrant（古诗向量库） · SQLite（生字表） · 通义千问 embedding · Maven。
 
 ## License
 
