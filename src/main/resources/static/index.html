@@ -12,30 +12,51 @@
       display: flex; justify-content: center;
       min-height: 100vh; padding: 24px 16px;
     }
+    button.secondary {
+      background: #fff; color: #6b8e4e; border: 1px solid #9db87f;
+    }
+    button.secondary:hover { background: #f0f4e8; }
+    /* 聊天布局 */
     .app {
       width: 100%; max-width: 840px; display: flex; gap: 12px;
       min-height: calc(100vh - 48px);
     }
-    /* 左侧：会话 tab 列表 */
+    /* 左侧：娃列表 */
     .sidebar {
       width: 180px; flex-shrink: 0; background: #fff; border-radius: 12px;
       padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
       display: flex; flex-direction: column; gap: 10px;
     }
-    #newChat {
-      background: #fff; color: #6b8e4e; border: 1px dashed #9db87f;
-      padding: 10px 12px; font-size: 14px;
+    /* 新娃表单：常驻侧栏顶部，输完昵称回车或点“创建”即建娃 */
+    #childForm { display: flex; flex-direction: column; gap: 6px; }
+    #childForm input {
+      padding: 9px 10px; border: 1px solid #ddd2c2; border-radius: 8px;
+      font-size: 14px; outline: none; background: #fff;
     }
-    #newChat:hover { background: #f0f4e8; }
-    #tabs { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
-    .tab {
-      display: flex; align-items: center; gap: 4px;
-      padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #6b5d49;
+    #childForm input:focus { border-color: #b5a488; }
+    #childForm .form-buttons { display: flex; gap: 6px; }
+    #childForm .form-buttons button { flex: 1; padding: 8px 0; font-size: 13px; }
+    /* 侧栏两级菜单：娃一级（可折叠）、聊天窗口二级 */
+    #tree { flex: 1; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+    .child-header {
+      display: flex; align-items: center; gap: 4px; padding: 6px 8px;
+      border-radius: 8px; font-size: 13px; font-weight: 600; color: #6b5d49;
       cursor: pointer;
     }
-    .tab:hover { background: #f5efe3; }
-    .tab.active { background: #e8f0de; color: #3d5226; font-weight: 600; }
-    .tab-title {
+    .child-header:hover { background: #f5efe3; }
+    .caret { flex-shrink: 0; width: 12px; font-size: 10px; color: #b0a695; text-align: center; }
+    .child-name {
+      flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .windows { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px 12px; }
+    .window {
+      display: flex; align-items: center; gap: 4px; padding: 6px 8px;
+      border-radius: 8px; font-size: 13px; color: #6b5d49; cursor: pointer;
+    }
+    .window:hover { background: #f5efe3; }
+    .window.active { background: #e8f0de; color: #3d5226; font-weight: 600; }
+    .window-title {
       flex: 1; min-width: 0; text-align: left;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
@@ -45,15 +66,29 @@
       color: #b0a695; cursor: pointer;
     }
     .tab-close:hover { color: #c0392b; }
+    .child-header .tab-close:hover { color: #6b8e4e; }
+    #logout {
+      background: #fff; color: #b0a695; border: none; font-size: 13px;
+      padding: 8px; text-align: center; border-top: 1px solid #f0ead9;
+    }
+    #logout:hover { color: #6b5d49; }
     /* 右侧：聊天主区 */
     .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
     header { text-align: center; margin-bottom: 16px; }
     header h1 { font-size: 22px; color: #4a3b2a; }
     header p { font-size: 13px; color: #9a8f80; margin-top: 4px; }
+    header p .clear {
+      color: #9db87f; cursor: pointer; margin-left: 8px;
+      text-decoration: underline dotted;
+    }
+    header p .clear:hover { color: #6b8e4e; }
     #chat {
       flex: 1; overflow-y: auto; background: #fff; border-radius: 12px;
       padding: 16px; min-height: 300px; max-height: 60vh;
       box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .empty-chat {
+      color: #b0a695; font-size: 14px; text-align: center; margin-top: 40px;
     }
     .msg { margin: 8px 0; line-height: 1.7; font-size: 15px; white-space: pre-wrap; }
     .user { text-align: right; }
@@ -79,101 +114,366 @@
     }
     button:disabled { background: #b8c4ab; cursor: not-allowed; }
     .hint { text-align: center; font-size: 12px; color: #b0a695; margin-top: 8px; }
-    /* 窄屏：左侧 tab 栏变成顶部横条，聊天区不至于被挤没 */
+    /* 窄屏：左侧娃列表变成顶部横条，聊天区不至于被挤没 */
     @media (max-width: 720px) {
       .app { flex-direction: column; min-height: 0; }
       .sidebar { width: 100%; flex-direction: row; align-items: center; }
-      #newChat { flex-shrink: 0; width: auto; }
-      #tabs { flex: 1; flex-direction: row; gap: 6px; overflow-x: auto; overflow-y: hidden; }
-      .tab { flex-shrink: 0; max-width: 140px; }
+      #childForm { flex-shrink: 0; width: 200px; }
+      #tree { flex: 1; flex-direction: row; gap: 8px; overflow-x: auto; overflow-y: hidden; align-items: center; }
+      .child-group { flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+      .windows { flex-direction: row; gap: 4px; margin: 0; align-items: center; }
+      .window { flex-shrink: 0; max-width: 140px; }
+      #logout { border-top: none; flex-shrink: 0; }
     }
   </style>
 </head>
 <body>
-<div class="app">
+
+<!-- 对话页：登录的事在 login.html，本页接口 401 会被送回去 -->
+<div class="app" id="chatView">
   <aside class="sidebar">
-    <button id="newChat" type="button">＋ 新聊天</button>
-    <nav id="tabs"></nav>
+    <div id="childForm">
+      <input id="nickname" placeholder="娃的昵称，如：老大" maxlength="20">
+      <div class="form-buttons">
+        <button id="createChild" type="button">创建</button>
+        <button id="cancelChild" type="button" class="secondary">取消</button>
+      </div>
+    </div>
+    <nav id="tree"></nav>
+    <button id="logout" type="button">退出登录</button>
   </aside>
   <main class="main">
     <header>
       <h1>字问先生</h1>
-      <p>问一个字，问一首诗，陪娃学习</p>
+      <p id="subTitle">陪娃学习<span class="clear" id="clearChat" title="清空当前窗口在服务端的记忆">清空聊天</span></p>
     </header>
     <div id="chat"></div>
     <form id="form">
       <input id="q" placeholder="例如：二年级那首写瀑布的诗，背给我听？" autocomplete="off" autofocus>
       <button id="send" type="submit">问</button>
     </form>
-    <p class="hint">当前会话 <span id="sid"></span> · 每个 tab 一个会话，聊天记录缓存在浏览器本地</p>
+    <p class="hint">每个窗口各聊各的，互不打扰 · 聊天记录缓存在浏览器本地</p>
   </main>
 </div>
+
 <script>
   const chat = document.getElementById('chat');
   const form = document.getElementById('form');
   const input = document.getElementById('q');
   const send = document.getElementById('send');
-  const tabsNav = document.getElementById('tabs');
-  const newChatButton = document.getElementById('newChat');
-  const sidLabel = document.getElementById('sid');
+  const tree = document.getElementById('tree');
+  const nicknameInput = document.getElementById('nickname');
+  const createChildButton = document.getElementById('createChild');
+  const cancelChildButton = document.getElementById('cancelChild');
+  const logoutButton = document.getElementById('logout');
+  const clearChatButton = document.getElementById('clearChat');
+  const subTitle = document.getElementById('subTitle');
 
-  // ===== 会话（tab）管理：会话列表 + 各会话消息都存 localStorage，刷新不丢 =====
-  const SESSIONS_KEY = 'ziwen-sessions';
-  const LEGACY_SESSION_KEY = 'ziwen-session'; // 旧版只存单个会话 id
+  // ===== 应用状态 =====
+  // children 与其 windows 都由服务端返回（归属当前家长），前端不再自造 id——身份的事服务端说了算
+  let children = []; // [{ id, nickname, expanded, windows: [{ id, title }] }]
+  let activeWindowId = null; // 聊天目标精确到窗口：同娃多窗口记忆互不串
+  const messagesByWindow = new Map(); // 窗口 id -> 消息数组（内存缓存，落盘走 localStorage）
+  let activeStream = null; // 正在流式输出的那条回答：{ abort, windowId, message }
+  let sessionConfirmed = false; // 进页后登录态被验证过：之后的 401 才算"过期"，首次加载的 401 只说明没登录
+  // 登录时存下的 token：此后每个请求（含 SSE 流）由页面放进 Authorization 头带回。
+  // 取的是快照，注销时同步删 localStorage，不依赖这里的变量
+  const token = localStorage.getItem('ziwen-token');
 
-  function loadSessions() {
+  // ===== API 封装：所有请求统一带 Authorization 头；401 跳登录页，业务错误抛给调用方展示 =====
+  async function api(path, options) {
+    const response = await fetch(path, {
+      ...options,
+      headers: { Authorization: 'Bearer ' + token, ...(options && options.headers) }
+    });
+    if (response.status === 401) {
+      toLogin(sessionConfirmed ? '登录过期了，请重新登录' : '');
+      throw new Error('请先登录');
+    }
+    const body = await response.json();
+    if (body.code !== 0) throw new Error(body.message);
+    return body.data;
+  }
+
+  function jsonPost(path, payload) {
+    return api(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  // ===== 登录页跳转：本页只管对话，登录态的事交给 login.html =====
+  function toLogin(tip) {
+    location.href = '/login.html' + (tip ? '?msg=' + encodeURIComponent(tip) : '');
+  }
+
+  function showChat() {
+    renderTree();
+    renderChat();
+    input.focus();
+  }
+
+  logoutButton.addEventListener('click', async () => {
+    localStorage.removeItem('ziwen-token'); // 先断本地登录态：注销请求发不出去（断网/过期）也照样回登录页
+    try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* 已断网/已过期也照样回到登录页 */ }
+    children = [];
+    activeWindowId = null;
+    toLogin();
+  });
+
+  // ===== 娃管理：表单常驻，点“取消”只清空输入内容 =====
+  cancelChildButton.addEventListener('click', () => {
+    nicknameInput.value = '';
+    nicknameInput.focus();
+  });
+  nicknameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') createChild();
+  });
+  createChildButton.addEventListener('click', createChild);
+
+  async function createChild() {
+    const nickname = nicknameInput.value.trim();
+    if (!nickname) return;
     try {
-      return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || [];
-    } catch {
-      return []; // 本地存储损坏时当作没有会话，重新开始
+      await jsonPost('/api/children', { nickname });
+      children = await api('/api/children');
+      nicknameInput.value = '';
+      // 新建的娃排最后（服务端按创建顺序返回）；窗口由 ensureWindows 补齐，选中最后一个直接开聊
+      const newChild = children[children.length - 1];
+      await ensureWindows(newChild);
+      activeWindowId = newChild.windows[newChild.windows.length - 1].id;
+      renderTree();
+      renderChat();
+    } catch (error) {
+      alert(error.message);
     }
   }
 
-  function saveSessions() {
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+  // ===== 窗口管理 =====
+
+  // 拉取娃名下窗口；一个都没有就补开一个（窗口化之前建的老娃迁移 + 保证有点可点的聊天入口）
+  async function ensureWindows(child) {
+    child.windows = await api('/api/children/' + child.id + '/windows');
+    if (child.windows.length === 0) {
+      child.windows = [await jsonPost('/api/children/' + child.id + '/windows', {})];
+    }
+    child.expanded = true;
   }
 
-  // 消息体按会话分开存，避免每次落盘都搬动全部会话的历史
-  function messagesKey(sessionId) {
-    return 'ziwen-msgs:' + sessionId;
+  async function createWindow(child) {
+    try {
+      const newWindow = await jsonPost('/api/children/' + child.id + '/windows', {});
+      child.windows.push(newWindow);
+      child.expanded = true;
+      switchTo(newWindow.id);
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
-  function getMessages(sessionId) {
-    if (!messagesBySession.has(sessionId)) {
+  async function removeWindow(child, window) {
+    if (!confirm('删除窗口「' + window.title + '」？该窗口的服务端记忆会一并删除。')) return;
+    if (activeStream && activeStream.windowId === window.id) {
+      activeStream.abort.abort(); // 该窗口还在流式输出：先断开，保留已生成的半截
+      finalizeStream();
+    }
+    try {
+      await api('/api/children/' + child.id + '/windows/' + window.id, { method: 'DELETE' });
+      child.windows = child.windows.filter((item) => item.id !== window.id);
+      messagesByWindow.delete(window.id);
+      localStorage.removeItem(messagesKey(window.id));
+      if (window.id === activeWindowId) {
+        activeWindowId = child.windows.length ? child.windows[0].id : null;
+      }
+      renderTree();
+      renderChat();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  // ===== 侧栏渲染：娃一级、窗口二级 =====
+  function renderTree() {
+    tree.innerHTML = '';
+    for (const child of children) {
+      const group = document.createElement('div');
+      group.className = 'child-group';
+
+      const header = document.createElement('div');
+      header.className = 'child-header';
+      header.title = '展开 / 收起「' + child.nickname + '」的聊天窗口';
+      header.addEventListener('click', () => {
+        child.expanded = !child.expanded;
+        renderTree();
+      });
+
+      const caret = document.createElement('span');
+      caret.className = 'caret';
+      caret.textContent = child.expanded ? '▾' : '▸';
+      header.appendChild(caret);
+
+      const name = document.createElement('span');
+      name.className = 'child-name';
+      name.textContent = child.nickname;
+      header.appendChild(name);
+
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'tab-close';
+      add.textContent = '＋';
+      add.title = '给「' + child.nickname + '」开一个新聊天窗口';
+      add.addEventListener('click', (event) => {
+        event.stopPropagation(); // 点 ＋ 只开新窗口，不触发折叠
+        createWindow(child);
+      });
+      header.appendChild(add);
+
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'tab-close';
+      close.textContent = '×';
+      close.title = '删除该娃（名下全部窗口与记忆一并删除）';
+      close.addEventListener('click', (event) => {
+        event.stopPropagation(); // 点 × 只删除，不触发折叠
+        removeChild(child);
+      });
+      header.appendChild(close);
+
+      group.appendChild(header);
+
+      if (child.expanded) {
+        const windows = document.createElement('div');
+        windows.className = 'windows';
+        for (const window of child.windows) {
+          windows.appendChild(windowRow(child, window));
+        }
+        group.appendChild(windows);
+      }
+
+      tree.appendChild(group);
+    }
+  }
+
+  function windowRow(child, window) {
+    const row = document.createElement('div');
+    row.className = 'window' + (window.id === activeWindowId ? ' active' : '');
+    row.addEventListener('click', () => switchTo(window.id));
+
+    const title = document.createElement('span');
+    title.className = 'window-title';
+    title.textContent = window.title;
+    row.appendChild(title);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'tab-close';
+    close.textContent = '×';
+    close.title = '删除该窗口（聊天记忆一并删除）';
+    close.addEventListener('click', (event) => {
+      event.stopPropagation(); // 点 × 只删除，不触发切换
+      removeWindow(child, window);
+    });
+    row.appendChild(close);
+
+    return row;
+  }
+
+  function switchTo(windowId) {
+    if (windowId === activeWindowId) return;
+    activeWindowId = windowId;
+    renderTree();
+    renderChat();
+    input.focus();
+  }
+
+  async function removeChild(child) {
+    if (!confirm('删除「' + child.nickname + '」？名下全部窗口与服务端记忆会一并删除。')) return;
+    if (activeStream && child.windows.some((window) => window.id === activeStream.windowId)) {
+      activeStream.abort.abort(); // 该娃的窗口还在流式输出：先断开，保留已生成的半截
+      finalizeStream();
+    }
+    try {
+      await api('/api/children/' + child.id, { method: 'DELETE' });
+      children = children.filter((item) => item.id !== child.id);
+      for (const window of child.windows) {
+        messagesByWindow.delete(window.id);
+        localStorage.removeItem(messagesKey(window.id));
+      }
+      if (child.windows.some((window) => window.id === activeWindowId)) {
+        activeWindowId = firstWindowId();
+      }
+      renderTree();
+      renderChat();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  clearChatButton.addEventListener('click', async () => {
+    if (!activeWindowId) return;
+    if (!confirm('清空当前窗口在服务端的聊天记忆？')) return;
+    try {
+      await api('/api/chat/memory/' + activeWindowId, { method: 'DELETE' });
+      messagesByWindow.set(activeWindowId, []);
+      localStorage.removeItem(messagesKey(activeWindowId));
+      renderChat();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
+  // ===== 消息缓存：按窗口分开存，避免每次落盘都搬动全部窗口的历史 =====
+  // 旧版缓存已无主，启动时清掉不留死数据：v0.5 前按会话 id 存的 ziwen-sessions、
+  // v0.5 按娃 id 存的 ziwen-msgs——窗口化后娃 id 不再是缓存键，留着只会撞新键
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key === 'ziwen-sessions' || key.startsWith('ziwen-msgs:')) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  function messagesKey(windowId) {
+    return 'ziwen-win-msgs:' + windowId;
+  }
+
+  function getMessages(windowId) {
+    if (!messagesByWindow.has(windowId)) {
       try {
-        messagesBySession.set(sessionId, JSON.parse(localStorage.getItem(messagesKey(sessionId))) || []);
+        messagesByWindow.set(windowId, JSON.parse(localStorage.getItem(messagesKey(windowId))) || []);
       } catch {
-        messagesBySession.set(sessionId, []);
+        messagesByWindow.set(windowId, []); // 本地存储损坏时当作空白，重新开始
       }
     }
-    return messagesBySession.get(sessionId);
+    return messagesByWindow.get(windowId);
   }
 
-  function saveMessages(sessionId) {
-    localStorage.setItem(messagesKey(sessionId), JSON.stringify(messagesBySession.get(sessionId) || []));
+  function saveMessages(windowId) {
+    localStorage.setItem(messagesKey(windowId), JSON.stringify(messagesByWindow.get(windowId) || []));
   }
 
-  let sessions = loadSessions();
-  if (sessions.length === 0) {
-    // 兼容旧版：沿用原来的会话 id，服务端那份记忆还能接上。
-    // 服务端历史没有查询接口，页面展示从本地缓存开始积累。
-    const legacySessionId = localStorage.getItem(LEGACY_SESSION_KEY);
-    sessions = [{ id: legacySessionId || crypto.randomUUID(), title: '聊天1' }];
-    localStorage.removeItem(LEGACY_SESSION_KEY);
-    saveSessions();
+  // ===== 定位辅助：由窗口找娃 / 由当前窗口找娃，全页只有一处真相 =====
+  function childOfWindow(windowId) {
+    return children.find((child) => child.windows.some((window) => window.id === windowId)) || null;
   }
-  // 旧版的"新聊天"占位标题按新规则补上编号
-  if (sessions.some((s) => s.title === '新聊天')) {
-    for (const session of sessions) {
-      if (session.title === '新聊天') session.title = nextSessionTitle();
+
+  function activeWindow() {
+    for (const child of children) {
+      const window = child.windows.find((item) => item.id === activeWindowId);
+      if (window) return window;
     }
-    saveSessions();
+    return null;
   }
-  let activeSessionId = sessions[0].id;
-  const messagesBySession = new Map(); // 会话 id -> 消息数组（内存缓存，落盘走 localStorage）
 
-  let activeStream = null; // 正在流式输出的那条回答：{ es, sessionId, message }
+  function activeChild() {
+    return childOfWindow(activeWindowId);
+  }
 
+  function firstWindowId() {
+    return children.flatMap((child) => child.windows)[0]?.id ?? null;
+  }
+
+  // ===== 聊天渲染 =====
   function bubble(role, text) {
     const div = document.createElement('div');
     div.className = 'msg ' + role;
@@ -185,126 +485,35 @@
     return span;
   }
 
-  function renderTabs() {
-    tabsNav.innerHTML = '';
-    for (const session of sessions) {
-      const tab = document.createElement('div');
-      tab.className = 'tab' + (session.id === activeSessionId ? ' active' : '');
-      tab.addEventListener('click', () => switchTo(session.id));
-
-      const title = document.createElement('span');
-      title.className = 'tab-title';
-      title.textContent = session.title;
-      tab.appendChild(title);
-
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.className = 'tab-close';
-      close.textContent = '×';
-      close.title = '删除该会话';
-      close.addEventListener('click', (e) => {
-        e.stopPropagation(); // 点 × 只删除，不触发切换会话
-        removeSession(session.id);
-      });
-      tab.appendChild(close);
-
-      tabsNav.appendChild(tab);
-    }
-  }
-
-  // 会话命名：聊天1、聊天2…取现有编号最大值 +1，删掉中间的也不重复
-  function nextSessionTitle() {
-    let maxNumber = 0;
-    for (const session of sessions) {
-      const match = session.title.match(/^聊天(\d+)$/);
-      if (match) maxNumber = Math.max(maxNumber, Number(match[1]));
-    }
-    return '聊天' + (maxNumber + 1);
-  }
-
-  // 删除会话：清本地缓存，并让服务端同步删掉 Redis 里的记忆
-  function removeSession(sessionId) {
-    if (activeStream && activeStream.sessionId === sessionId) {
-      activeStream.es.close(); // 该会话还在流式输出：先断开，保留已生成的半截
-      finalizeStream();
-    }
-    // 本地删除不依赖后端成功，失败也不阻塞 UI
-    fetch('/api/chat/' + encodeURIComponent(sessionId), { method: 'DELETE' }).catch(() => {});
-    sessions = sessions.filter((s) => s.id !== sessionId);
-    messagesBySession.delete(sessionId);
-    localStorage.removeItem(messagesKey(sessionId));
-    saveSessions();
-
-    if (sessionId === activeSessionId) {
-      if (sessions.length === 0) createSession(); // 全删光了：自动新开一个空会话
-      switchTo(sessions[0].id);
-    } else {
-      renderTabs();
-    }
-  }
-
   function renderChat() {
     chat.innerHTML = '';
     statusLine = null; // 状态行是临时元素，随聊天区一起清掉，别留悬空引用
-    for (const message of getMessages(activeSessionId)) {
+    const child = activeChild();
+    const window = activeWindow();
+    if (!child || !window) {
+      const tip = document.createElement('p');
+      tip.className = 'empty-chat';
+      tip.textContent = children.length === 0
+        ? '先在左边给娃建个档案吧——只需要一个昵称'
+        : '在左边选一个窗口开始聊';
+      chat.appendChild(tip);
+      subTitle.firstChild.textContent = '陪娃学习';
+      clearChatButton.style.display = 'none';
+      return;
+    }
+    subTitle.firstChild.textContent = '正在陪「' + child.nickname + '」· ' + window.title;
+    clearChatButton.style.display = '';
+    for (const message of getMessages(activeWindowId)) {
       bubble(message.role, message.text);
     }
     chat.scrollTop = chat.scrollHeight;
   }
 
-  function switchTo(sessionId) {
-    if (sessionId === activeSessionId) return;
-    activeSessionId = sessionId;
-    renderTabs();
-    renderChat();
-    sidLabel.textContent = sessionId.slice(0, 8);
-    input.focus();
-  }
-
-  // 建新会话：编号取名，新会话排最前
-  function createSession() {
-    const session = { id: crypto.randomUUID(), title: nextSessionTitle() };
-    sessions.unshift(session);
-    saveSessions();
-    messagesBySession.set(session.id, []);
-    saveMessages(session.id);
-    return session;
-  }
-
-  newChatButton.addEventListener('click', () => {
-    if (activeStream) {
-      // 上一个回答还在流式输出：断开连接，保留已生成的部分
-      activeStream.es.close();
-      finalizeStream();
-    }
-    switchTo(createSession().id);
-  });
-
-  // 流式收尾：落盘回答、恢复输入框。正常结束和出错都会走到这里
-  function finalizeStream() {
-    if (!activeStream) return;
-    const sessionId = activeStream.sessionId;
-    activeStream = null;
-    hideStatus();
-    saveMessages(sessionId);
-    send.disabled = false;
-    input.focus();
-  }
-
-  // 只把最新回答写进当前会话的最后一个气泡；流式期间切走再切回也能接上
-  function updateLiveBubble() {
-    if (!activeStream || activeStream.sessionId !== activeSessionId) return;
-    const lastBubble = chat.lastElementChild;
-    if (lastBubble) lastBubble.firstElementChild.textContent = activeStream.message.text;
-  }
-
-  // ===== 工具状态行：SSE 具名 status 事件（"字问先生正在翻古诗书…"） =====
-  // 工具执行期间一个 token 都不吐，这行字就是那几秒白屏里唯一的动静；
-  // 回答的第一个 token 一到就撤，不需要"查完了"事件
+  // ===== 聊天发送（SSE 流式） =====
   let statusLine = null;
 
   function showStatus(text) {
-    if (!activeStream || activeStream.sessionId !== activeSessionId) return;
+    if (!activeStream || activeStream.windowId !== activeWindowId) return;
     if (!statusLine) {
       statusLine = document.createElement('div');
       statusLine.className = 'status';
@@ -318,49 +527,150 @@
     if (statusLine) { statusLine.remove(); statusLine = null; }
   }
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
+  // 流式收尾：落盘回答、刷新窗口标题、恢复输入框。正常结束和出错都会走到这里
+  function finalizeStream() {
+    if (!activeStream) return;
+    const windowId = activeStream.windowId;
+    activeStream = null;
+    hideStatus();
+    saveMessages(windowId);
+    refreshTitleIfDefault(windowId);
+    send.disabled = false;
+    input.focus();
+  }
+
+  // 首问的服务端自动改名此刻已落库；侧栏还挂着默认标题就把窗口列表拉一遍。
+  // 异步静默：拉不到不影响聊天，下次收尾还会再试
+  async function refreshTitleIfDefault(windowId) {
+    const child = childOfWindow(windowId);
+    const window = child && child.windows.find((item) => item.id === windowId);
+    if (!window || window.title !== '新聊天') return;
+    try {
+      child.windows = await api('/api/children/' + child.id + '/windows');
+      renderTree();
+    } catch { /* 拉不到就先挂着默认标题 */ }
+  }
+
+  // 只把最新回答写进当前窗口的最后一个气泡；流式期间切窗口再切回也能接上
+  function updateLiveBubble() {
+    if (!activeStream || activeStream.windowId !== activeWindowId) return;
+    const lastBubble = chat.lastElementChild;
+    if (lastBubble) lastBubble.firstElementChild.textContent = activeStream.message.text;
+  }
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
     const question = input.value.trim();
-    if (!question || activeStream) return;
+    if (!question || activeStream || !activeWindowId) return;
     input.value = '';
 
-    const messages = getMessages(activeSessionId);
+    const messages = getMessages(activeWindowId);
     messages.push({ role: 'user', text: question });
     bubble('user', question);
 
     const aiMessage = { role: 'ai', text: '' };
     messages.push(aiMessage);
     bubble('ai', '');
-    saveMessages(activeSessionId);
+    saveMessages(activeWindowId);
 
     send.disabled = true;
-
-    // SSE 流式：EventSource 只支持 GET
-    const es = new EventSource(
-      '/api/chat/stream?sessionId=' + encodeURIComponent(activeSessionId) +
-      '&question=' + encodeURIComponent(question));
-    activeStream = { es, sessionId: activeSessionId, message: aiMessage };
-
-    es.onmessage = (ev) => {
-      hideStatus(); // token 一到，状态行的使命就结束了
-      aiMessage.text += ev.data;
-      updateLiveBubble();
-      chat.scrollTop = chat.scrollHeight;
-    };
-    // 工具状态是具名事件，和逐 token 的默认事件分流（EventSource 按事件名分派）
-    es.addEventListener('status', (ev) => showStatus(ev.data));
-    // 连接关闭（正常结束也走这里）都会触发 onerror，兜底提示
-    es.onerror = () => {
-      es.close();
-      if (!aiMessage.text) aiMessage.text = '（出错了，请稍后再试）';
-      updateLiveBubble();
-      finalizeStream();
-    };
+    startStream(question, aiMessage);
   });
 
-  renderTabs();
-  renderChat();
-  sidLabel.textContent = activeSessionId.slice(0, 8);
+  // ===== SSE 流式（fetch 读流版）=====
+  // EventSource 发不了自定义头，登录态改走 Authorization 头后只能自己读流解析；
+  // 它那套自动重连本来就用不上——一条流就是一次问答，失败走错误兜底
+  async function startStream(question, aiMessage) {
+    const abort = new AbortController();
+    activeStream = { abort, windowId: activeWindowId, message: aiMessage };
+    // 流里一个字都没收到时才提示出错；收到过的半截回答保留
+    const fail = () => {
+      if (!aiMessage.text) aiMessage.text = '（出错了，请稍后再试）';
+      updateLiveBubble();
+    };
+    try {
+      const response = await fetch(
+          '/api/chat/stream?windowId=' + encodeURIComponent(activeStream.windowId) +
+          '&question=' + encodeURIComponent(question), {
+            headers: { Authorization: 'Bearer ' + token },
+            signal: abort.signal
+          });
+      if (response.status === 401) {
+        toLogin(sessionConfirmed ? '登录过期了，请重新登录' : '');
+        return; // 页面即将跳转，不必收尾
+      }
+      // 业务错误（如"没有这个窗口"）不走 SSE，是 200 + JSON
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/event-stream')) {
+        const body = await response.json();
+        if (body.code !== 0) aiMessage.text = body.message;
+        updateLiveBubble();
+        return;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // SSE 以空行分事件；缓冲区里凑齐一个就分派一个
+        let boundary;
+        while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+          dispatchSse(buffer.slice(0, boundary), aiMessage);
+          buffer = buffer.slice(boundary + 2);
+        }
+      }
+      fail();
+    } catch (error) {
+      if (error.name === 'AbortError') return; // 主动断开（删窗口/删娃）：半截回答保留
+      fail();
+    } finally {
+      finalizeStream();
+    }
+  }
+
+  // 解析一个 SSE 事件块（若干行 event:/data:）：逐 token 是默认事件，
+  // 工具状态是具名 status 事件，与 EventSource 时代同一条分派规则
+  function dispatchSse(block, aiMessage) {
+    let eventName = 'message';
+    const dataLines = [];
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        // 冒号后的第一个空格是分隔符，与 EventSource 的解析规则一致
+        const data = line.slice(5);
+        dataLines.push(data.startsWith(' ') ? data.slice(1) : data);
+      }
+    }
+    const data = dataLines.join('\n');
+    if (eventName === 'status') {
+      showStatus(data);
+      return;
+    }
+    hideStatus(); // token 一到，状态行的使命就结束了
+    aiMessage.text += data;
+    updateLiveBubble();
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // ===== 启动：本地没存 token 直接回登录页；带着 token 问一句"我是谁、我有哪些娃" =====
+  (async function init() {
+    if (!token) { toLogin(''); return; }
+    try {
+      children = await api('/api/children');
+      sessionConfirmed = true;
+      for (const child of children) {
+        await ensureWindows(child); // 老娃迁移：窗口化之前建的娃还没有窗口，补开一个
+      }
+      activeWindowId = firstWindowId();
+      showChat();
+    } catch (error) {
+      // 401 在 api() 里已经跳走；走到这里的是服务不可达之类，也送回登录页捎句话
+      if (error.message !== '请先登录') toLogin(error.message);
+    }
+  })();
 </script>
 </body>
 </html>

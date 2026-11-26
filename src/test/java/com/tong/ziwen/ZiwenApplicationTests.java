@@ -1,4 +1,4 @@
-package com.tong.ziwen.ai;
+package com.tong.ziwen;
 
 import java.util.List;
 

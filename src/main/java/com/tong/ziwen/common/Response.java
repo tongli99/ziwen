@@ -1,4 +1,4 @@
-package com.tong.ziwen.ai.common;
+package com.tong.ziwen.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

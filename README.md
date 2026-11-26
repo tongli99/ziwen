@@ -4,9 +4,9 @@
 
 陪娃写作业的 AI 伴读——"字问先生"像爸妈一样耐心。
 
-这是 **LangChain4j 中文入门教程系列的配套项目**：一篇教程 = 一个产品能力 = 一个 git tag，`git checkout` 对应版本即可跟着写。当前版本 **v0.4**。
+这是 **LangChain4j 中文入门教程系列的配套项目**：一篇教程 = 一个产品能力 = 一个 git tag，`git checkout` 对应版本即可跟着写。当前版本 **v0.5**。
 
-## 当前版本能做什么（v0.4）
+## 当前版本能做什么（v0.5）
 
 | 能力 | 说明 |
 |---|---|
@@ -21,6 +21,7 @@
 | 有刹车 | 工具循环护栏：单轮调用超过 ai.tool.max-calls-per-turn 次回劝停文本，模型拿已查到的结果收尾而不是报错；框架保险丝同步收紧（100 圈 → 10 圈） |
 | 不干等 | 工具执行的白屏期有动静：SSE 具名 status 事件推"字问先生正在翻古诗书…"，首个 token 一到自动撤掉 |
 | 懂生字 | 生字表结构化查询：问"灌字哪课学的"秒答第几课第几页，要"第 2 课预习字表"按课列出——向量答不了的精确事实，走 SQLite 白名单查询 |
+| 分得清 | 多用户隔离：家长账号下挂娃、娃名下再挂多个聊天窗口，记忆键是"家长:娃:窗口"三段——同娃多窗口、老大老二、跨家庭各聊各的，请求参数冒充不出别家的键 |
 
 ## 演进路线
 
@@ -33,8 +34,9 @@
 | v0.3 | Agentic RAG（@Tool、该查才查、拒答） | ✅ |
 | v0.3.1 | 拒答做硬（相似度阈值、工具入参防御、结构化日志） | ✅ |
 | v0.3.2 | 工具循环护栏（软闸限次、保险丝收紧、status 状态推送、记忆窗口放宽到 30 条） | ✅ |
-| v0.4 | 生字表结构化查询（SQLite、只读白名单查询、"字→课"与"课→字表"两个工具） | ✅ 当前 |
-| v0.5 | 多 Agent 路由 + 多用户记忆隔离 | ⬜ |
+| v0.4 | 生字表结构化查询（SQLite、只读白名单查询、"字→课"与"课→字表"两个工具） | ✅ |
+| v0.5 | 多用户隔离 + 家长注册（记忆键 parentId:childId:windowId、多窗口、轻量认证、儿童信息最小化） | ✅ 当前 |
+| v0.5b | 多 Agent 路由与任务分解 | ⬜ |
 | v0.6 | 听写模式、错词本、评测、一键部署 | ⬜ |
 
 ## 快速开始
@@ -59,7 +61,7 @@ docker compose up -d
 mvn spring-boot:run
 ```
 
-打开 http://localhost:8082 ，问一句试试：
+打开 http://localhost:8082 ，先注册一个家长账号（用户名 + 密码），给娃建个档案（只要一个昵称），然后问一句试试：
 
 ```
 你：二年级那首写瀑布的诗，背给我听？
@@ -73,20 +75,29 @@ AI：我的古诗书里还没有这首哦。
 
 ## 接口
 
+v0.5 起除注册/登录/注销外全部要求登录：token 放在登录响应的 data 里，前端存 localStorage，
+此后每个请求以 `Authorization: Bearer` 头带回，校验不过返回 401。
+
 | 接口 | 说明 |
 |---|---|
-| `GET /` | 内置聊天页面 |
-| `POST /api/chat` | 同步问答，body：`{"sessionId": "...", "question": "..."}` |
-| `GET /api/chat/stream?sessionId=...&question=...` | SSE 流式问答，逐 token 推送；工具执行期间另推具名 status 事件 |
-| `DELETE /api/chat/{sessionId}` | 清空该会话的对话记忆（从 Redis 删） |
+| `GET /` | 内置对话页面（未登录自动跳转独立登录页 login.html） |
+| `POST /api/auth/register` | 家长注册，body：`{"username": "...", "password": "..."}`，成功即在响应里返回 token |
+| `POST /api/auth/login` / `POST /api/auth/logout` | 登录 / 注销（注销即删 Redis 里的 token） |
+| `GET /api/children` / `POST /api/children` | 列出 / 新建娃档案（娃只有昵称一个字段） |
+| `GET /api/children/{childId}/windows` / `POST 同路径` | 列出 / 新开聊天窗口：一个娃可开多个，窗口间记忆互不串 |
+| `DELETE /api/children/{childId}/windows/{windowId}` | 删除窗口：SQLite 删窗口行，连带清空其对话记忆 |
+| `DELETE /api/children/{childId}` | 删除娃：SQLite 删档案与名下全部窗口，连带清空各窗口的对话记忆 |
+| `POST /api/chat` | 同步问答，body：`{"windowId": 1, "question": "..."}`，记忆键由家长 id + 娃 id + 窗口 id 在服务端拼成 |
+| `GET /api/chat/stream?windowId=...&question=...` | SSE 流式问答，逐 token 推送；工具执行期间另推具名 status 事件 |
+| `DELETE /api/chat/memory/{windowId}` | 清空该窗口的对话记忆（从 Redis 删，窗口档案不动） |
 | `GET /api/poems` | 古诗库全量列表 |
 | `GET /api/poems/search?question=...` | 裸检索：不调 chat 模型，返回命中的古诗 + 相似度得分；低于 `ai.rag.min-score` 的命中被过滤，空结果即"书里没有" |
 
-接口调试样例在 [http/](http/) 目录，VSCode 装 REST Client 扩展后，逐条点 Send Request 即可。
+接口调试样例在 [http/](http/) 目录，VSCode 装 REST Client 扩展后，逐条点 Send Request 即可（登录响应脚本把 token 存进变量，同文件内后续请求自动带上）。
 
 ## 技术栈
 
-Java 21 · Spring Boot 3.5 · LangChain4j 1.19 · Redis（对话记忆） · Qdrant（古诗向量库） · SQLite（生字表） · 通义千问 embedding · Maven。
+Java 21 · Spring Boot 3.5 · LangChain4j 1.19 · Redis（对话记忆 + 登录 token） · Qdrant（古诗向量库） · SQLite（生字表 + 用户档案） · 通义千问 embedding · Maven。
 
 ## License
 

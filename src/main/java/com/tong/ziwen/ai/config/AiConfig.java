@@ -23,6 +23,7 @@ import dev.langchain4j.service.tool.AiServiceTool;
 import dev.langchain4j.service.tool.DefaultToolExecutor;
 import dev.langchain4j.service.tool.ToolExecutor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -34,9 +35,12 @@ import static dev.langchain4j.agent.tool.ToolSpecifications.toolSpecificationFro
  *
  * <p>对话模型走 OpenAI 兼容协议（OpenAiChatModel / OpenAiStreamingChatModel），
  * 通过 base-url 指向 DeepSeek 等任意兼容提供方。流式与同步使用同一套参数。</p>
+ *
+ * <p>本类认领 {@link AiProperties} 的注册：谁消费这份配置谁注册，主类不集中代办。</p>
  */
 @Configuration
 @RequiredArgsConstructor
+@EnableConfigurationProperties(AiProperties.class)
 public class AiConfig {
 
     private final AiProperties properties;

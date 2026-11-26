@@ -51,7 +51,7 @@ public class PoemSearchTool {
         String sanitized = sanitize(query);
         // 空检索词不值得向量化一趟：直接当 0 命中处理，老实回"没查到"，不猜模型想查什么
         List<PoemHit> hits = sanitized.isEmpty() ? List.of() : poemService.search(sanitized);
-        // 每次工具调用一行结构化日志：sessionId 由 @ToolMemoryId 注入
+        // 每次工具调用一行结构化日志：sessionId 由 @ToolMemoryId 注入（家长:娃:窗口）
         log.info("tool=searchPoems | sessionId={} | query=\"{}\" | hits={} | elapsedMs={}",
                 sessionId, sanitized, hits.size(), System.currentTimeMillis() - startedAt);
         if (sanitized.isEmpty()) {

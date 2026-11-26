@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.tong.ziwen.ai.common.Response;
+import com.tong.ziwen.common.Response;
 import com.tong.ziwen.ai.dto.Poem;
 import com.tong.ziwen.ai.dto.PoemHit;
 import com.tong.ziwen.ai.service.PoemService;

@@ -7,7 +7,9 @@ import dev.langchain4j.service.UserMessage;
 /**
  * "字问先生"伴读伙伴接口，由 AiServices 动态代理实现。
  *
- * <p>同一个接口可同时提供同步与流式两种返回。</p>
+ * <p>同一个接口可同时提供同步与流式两种返回。{@code @MemoryId} 传的是 sessionId
+ * {@code parentId:childId:windowId}：一个窗口一个命名空间，同娃多窗口、
+ * 不同娃、不同家庭，互不串门。</p>
  */
 public interface Companion {
 

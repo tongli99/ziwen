@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN" "https://www.springframework.org/dtd/spring-beans-2.0.dtd">
+
+<!-- SQLite 错误码补充表（v0.5 起）。
+     Spring 自带的 sql-error-codes.xml 收录了 MySQL、Oracle、H2 等主流库，唯独没有 SQLite：
+     sqlite-jdbc 撞 UNIQUE 约束时报 SQL state=null、error code=19，按错误码表查不到对应项，
+     异常翻译降级成 UncategorizedSQLException——一个"未归类"大筐，
+     按 DataAccessException 子族（DuplicateKeyException 等）catch 根本接不住。
+     本文件放在 classpath 根（文件名固定），启动时与默认表合并、同名 bean 覆盖，
+     给 SQLite 补一行"错误码 19 → 重复键"的映射，此后约束冲突翻译成 DuplicateKeyException。
+     说明：19 是 SQLITE_CONSTRAINT 整族（NOT NULL/CHECK/UNIQUE…）的公共码；本库经
+     JdbcTemplate 写入、可能撞约束的只有 parent_account（username UNIQUE）和
+     child_profile（(parent_id, nickname) 唯一索引），按"重复键"翻译不会冤枉别的错误。 -->
+<beans>
+    <bean id="SQLite" class="org.springframework.jdbc.support.SQLErrorCodes">
+        <property name="duplicateKeyCodes">
+            <value>19</value>
+        </property>
+    </bean>
+</beans>

@@ -1,0 +1,121 @@
+### 多用户隔离（对应 tag v0.5）——家长注册 → 建娃开窗 → 各聊各的，验收"谁和谁都不串门"
+### 前置：docker compose up -d + mvn spring-boot:run
+### 登录态走 Authorization: Bearer 头（token 在注册/登录响应的 data 里，前端存 localStorage）：
+### 本文件用 REST Client 变量接力——响应脚本里 client.global.set 存下 token，后续请求引用 {{token}}
+### （旧文件 chat.http / memory.http 的 sessionId 接口对应 v0.1~v0.4 的 tag，在 v0.5 会 401）
+
+@host = http://localhost:8082
+
+### 1. 家长注册：用户名 + 密码（密码只在请求途中是明文，落库前已 BCrypt 哈希）
+###    注册即登录：响应 data 里就是 token，下方脚本存进变量，后续请求自动带上
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{"username": "dad-test", "password": "secret-123"}
+
+> {%
+    client.global.set("token", response.body.data);
+%}
+
+### 2. 重复注册：应返回"用户名已被注册"（UNIQUE 约束兜底）
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{"username": "dad-test", "password": "another-456"}
+
+### 3. 登录：密码错与用户名不存在回同一句"用户名或密码不对"——不给探测者留破绽
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{"username": "dad-test", "password": "wrong"}
+
+### 4. 正确密码登录（若第 1 步刚注册过，此步可跳过；token 已在手）
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{"username": "dad-test", "password": "secret-123"}
+
+> {%
+    client.global.set("token", response.body.data);
+%}
+
+
+### 5. 建娃·老大：昵称是娃档案的唯一信息——没有姓名/学校/生日可填，合规落在数据模型
+POST {{host}}/api/children
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"nickname": "老大"}
+
+### 6. 建娃·老二
+POST {{host}}/api/children
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"nickname": "老二"}
+
+### 7. 列出我家娃：应有两个（id 依次是 1、2 这样的自增数，下文以 childId=1、2 为例）
+GET {{host}}/api/children
+Authorization: Bearer {{token}}
+
+### 8. 给老大开聊天窗口：一个娃可开多个；响应里的 id 即 windowId（下文以 1、2… 为例）
+POST {{host}}/api/children/1/windows
+Authorization: Bearer {{token}}
+
+### 9. 老大窗口一自我介绍：windowId=1（记忆键将是 parentId:childId:windowId）
+POST {{host}}/api/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"windowId": 1, "question": "记住哦，我最喜欢的诗是《望庐山瀑布》"}
+
+### 10. 同娃再开一个窗口：响应里的 id 即 windowId=2（下文用它追问）
+POST {{host}}/api/children/1/windows
+Authorization: Bearer {{token}}
+
+### 10b. 新窗口里问同一句：它不知道窗口一说过什么（同娃窗口间记忆也隔离）
+POST {{host}}/api/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"windowId": 2, "question": "我最喜欢的诗是什么来着"}
+
+### 11. 切回窗口一再问：记忆还是窗口一的（验收核心——同娃窗口、不同娃、不同家庭互不相见）
+POST {{host}}/api/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"windowId": 1, "question": "我最喜欢的诗是什么来着"}
+
+### 12. 首问自动命名：第 9 步发过一句后，窗口一的标题已从"新聊天"换成问题开头
+GET {{host}}/api/children/1/windows
+Authorization: Bearer {{token}}
+
+### 13. 跨家庭串号实验：windowId 传别家的窗口 id（先注册第二个家长、看它家窗口的 id）
+###     传了别家窗口 id 也只回"没有这个窗口"——窗口→娃→家长三层归属校验在服务端，请求参数冒充不了
+
+### 14. 去 Redis 里亲眼看隔离（终端里跑，不用 REST Client）：
+###     redis-cli
+###     > KEYS ziwen:chat:memory:*          -- 能看到 ziwen:chat:memory:1:1:1 和 :1:1:2 这样的三段 key
+###     > KEYS ziwen:auth:token:*          -- 登录 token 也在这里，滑动过期
+###     （重启服务后重复第 11 步：记忆还在、登录态还在）
+
+### 15. 清空窗口二的聊天记忆（窗口与娃档案都不动）
+DELETE {{host}}/api/chat/memory/2
+Authorization: Bearer {{token}}
+
+### 16. 流式问答照常：windowId 换掉了 childId，SSE 具名 status 事件不变
+###     （页面端改由 fetch 读流才能带头；REST Client 直接收响应，写法不变）
+GET {{host}}/api/chat/stream?windowId=1&question=背一下写瀑布的那首诗
+Authorization: Bearer {{token}}
+
+### 17. 删除窗口一：SQLite 删窗口行 + Redis 删记忆（娃档案与其它窗口不动）
+DELETE {{host}}/api/children/1/windows/1
+Authorization: Bearer {{token}}
+
+### 18. 注销：Redis 里删 token（立即失效），前端随后清掉 localStorage；此后再发第 7 步会 401
+POST {{host}}/api/auth/logout
+Authorization: Bearer {{token}}
+
+### 19. 未登录验证：应返回 HTTP 401 + body code=1（拦截器认不出头里的 token + 全局异常处理）
+GET {{host}}/api/children

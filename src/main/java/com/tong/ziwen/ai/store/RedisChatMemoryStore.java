@@ -64,7 +64,7 @@ public class RedisChatMemoryStore implements ChatMemoryStore {
         redisTemplate.delete(keyOf(memoryId));
     }
 
-    /** 完整 key = 前缀 + sessionId，如 {@code ziwen:chat:memory:kid-001}。 */
+    /** 完整 key = 前缀 + sessionId，如 {@code ziwen:chat:memory:1:2:3}（家长 1 的娃 2 的窗口 3）。 */
     private String keyOf(Object memoryId) {
         return properties.getMemory().getKeyPrefix() + memoryId;
     }

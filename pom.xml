@@ -13,7 +13,7 @@
 
     <groupId>com.tong</groupId>
     <artifactId>ziwen</artifactId>
-    <version>0.4</version>
+    <version>0.5</version>
     <name>ziwen</name>
     <description>字问 —— 陪娃学习的 AI 替身（LangChain4j 教程系列配套项目）</description>
 
@@ -75,6 +75,13 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.50.3.0</version>
+        </dependency>
+        <!-- 密码哈希（v0.5 起）：只引 crypto 模块拿 BCryptPasswordEncoder，
+             不引 spring-boot-starter-security——认证走自建拦截器 + Redis token，
+             Spring Security 的过滤链那套不在本教程范围。版本由 Boot 父 POM 管理 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
         <dependency>
