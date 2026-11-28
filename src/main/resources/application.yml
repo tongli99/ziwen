@@ -34,6 +34,8 @@ ai:
     model-name: ${AI_CHAT_MODEL:deepseek-v4-pro}
 
     temperature: 0.7
+    # 分诊（RouterAgent）的温度（v0.5.1 起）：与对话模型同一套地址密钥，只关到 0——分类不带随机性，同一句话每次归同一类
+    router-temperature: 0.0
   # embedding 模型：第二提供方。DeepSeek 只有 chat 没有 embedding，
   # 这里指向通义千问 DashScope 的 OpenAI 兼容端点——同一套协议模块，只换地址和模型名
   embedding:
@@ -69,5 +71,7 @@ ai:
     token-ttl: 7d   #连续 7 天不打开字问，登录态自动失效，需重新登录
 
 logging:
+  charset:
+    console: UTF-8
   level:
     dev.langchain4j: INFO

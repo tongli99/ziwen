@@ -17,7 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.tong.ziwen.common.AuthAttributes;
 import com.tong.ziwen.common.Response;
 import com.tong.ziwen.ai.dto.ChatRequest;
-import com.tong.ziwen.ai.service.Companion;
+import com.tong.ziwen.ai.service.ChatDispatcher;
 import com.tong.ziwen.ai.service.UserService;
 import com.tong.ziwen.ai.tool.ToolCallLimiter;
 import com.tong.ziwen.ai.tool.ToolStatusHub;
@@ -36,6 +36,9 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>v0.3.2 起附加两项工作不变：每轮入口重置工具限次器计数（限制范围是单轮）；
  * 流式开始时将 emitter 登记到 {@link ToolStatusHub}，使工具状态能够推送到前端页面。</p>
+ *
+ * <p>v0.5.1起不再直接调全能伴读：问答先过 ChatDispatcher 分诊，背诗、查字
+ * 各交各的专才，其余（含分不准的）落回全能伴读兜底。对外接口与请求参数不变。</p>
  */
 @Slf4j
 @RestController
@@ -43,7 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final Companion companion;
+    private final ChatDispatcher chatDispatcher;
     private final UserService userService;
     private final ChatMemoryStore chatMemoryStore;
     private final ToolCallLimiter toolCallLimiter;
@@ -60,7 +63,7 @@ public class ChatController {
         String sessionId = userService.sessionIdOf(parentId, request.getWindowId());
         userService.retitleIfDefault(parentId, request.getWindowId(), request.getQuestion());
         toolCallLimiter.reset(sessionId);
-        return Response.ok(companion.chat(sessionId, request.getQuestion()));
+        return Response.ok(chatDispatcher.chat(sessionId, request.getQuestion()));
     }
 
     /**
@@ -78,7 +81,7 @@ public class ChatController {
         SseEmitter emitter = new SseEmitter(120_000L);
         toolCallLimiter.reset(sessionId);
         toolStatusHub.register(sessionId, emitter);
-        companion.stream(sessionId, question)
+        chatDispatcher.stream(sessionId, question)
                 .onPartialResponse(token -> {
                     try {
                         emitter.send(SseEmitter.event().data(token));

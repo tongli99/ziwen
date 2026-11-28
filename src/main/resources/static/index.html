@@ -236,12 +236,13 @@
     const nickname = nicknameInput.value.trim();
     if (!nickname) return;
     try {
-      await jsonPost('/api/children', { nickname });
-      children = await api('/api/children');
+      // 新建接口本身就回娃档案，本地补齐窗口再入列。不重拉整表：列表接口只回
+      // {id, nickname}，windows / expanded 是前端自己补的状态，整表替换会把
+      // 别的娃的 windows 冲成 undefined，侧栏与聊天区渲染到一半就崩
+      const newChild = await jsonPost('/api/children', { nickname });
       nicknameInput.value = '';
-      // 新建的娃排最后（服务端按创建顺序返回）；窗口由 ensureWindows 补齐，选中最后一个直接开聊
-      const newChild = children[children.length - 1];
-      await ensureWindows(newChild);
+      await ensureWindows(newChild); // 先补齐再入列：中途失败，列表里不留半截娃
+      children.push(newChild);
       activeWindowId = newChild.windows[newChild.windows.length - 1].id;
       renderTree();
       renderChat();

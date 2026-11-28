@@ -56,6 +56,12 @@ public class AiProperties {
         @NotBlank
         private String modelName;
         private Double temperature;
+
+        /**
+         * 分诊（RouterAgent）的采样温度，具体取值见 application.yml。对话模型的 temperature 带随机性，
+         * 用来分类会让同一句话每次归到不同的类，验收与评测都掺进噪声，所以分诊单独配一个。
+         */
+        private Double routerTemperature;
     }
 
     /**

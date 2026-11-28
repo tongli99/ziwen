@@ -4,8 +4,12 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.stream.Stream;
 
 import com.tong.ziwen.ai.service.Companion;
+import com.tong.ziwen.ai.service.HanziTutor;
+import com.tong.ziwen.ai.service.PoemTutor;
+import com.tong.ziwen.ai.service.RouterAgent;
 import com.tong.ziwen.ai.store.RedisChatMemoryStore;
 import com.tong.ziwen.ai.tool.HanziTool;
 import com.tong.ziwen.ai.tool.PoemSearchTool;
@@ -37,6 +41,10 @@ import static dev.langchain4j.agent.tool.ToolSpecifications.toolSpecificationFro
  * 通过 base-url 指向 DeepSeek 等任意兼容提供方。流式与同步使用同一套参数。</p>
  *
  * <p>本类认领 {@link AiProperties} 的注册：谁消费这份配置谁注册，主类不集中代办。</p>
+ *
+ * <p>v0.5.1 起装配的 AiServices 分身有四个：{@link RouterAgent} 分诊、
+ * {@link PoemTutor} 与 {@link HanziTutor} 两个专才、{@link Companion} 全能兜底；
+ * 先分诊再分发的编排逻辑在 ChatDispatcher，不在本类。</p>
  */
 @Configuration
 @RequiredArgsConstructor
@@ -53,6 +61,7 @@ public class AiConfig {
                 .apiKey(chat.getApiKey())
                 .modelName(chat.getModelName())
                 .temperature(chat.getTemperature())
+                .listeners(new ChatModelLogListener())
                 .build();
     }
 
@@ -64,6 +73,7 @@ public class AiConfig {
                 .apiKey(chat.getApiKey())
                 .modelName(chat.getModelName())
                 .temperature(chat.getTemperature())
+                .listeners(new ChatModelLogListener())
                 .build();
     }
 
@@ -73,6 +83,10 @@ public class AiConfig {
      * <p>窗口策略与存储在本处组合：{@code MessageWindowChatMemory} 负责裁剪，
      * {@code RedisChatMemoryStore} 负责持久化。服务重启后同一 {@code memoryId}
      * 仍能读回历史，重启不丢失记忆即依赖这一处 {@code chatMemoryStore(...)}。</p>
+     *
+     * <p>v0.5.1 起打开 {@code alwaysKeepSystemMessageFirst}：每轮调用框架都把当前分身的 system message
+     * 写进记忆，分身一换人就换一条；框架默认把新的追加到列表末尾，发给模型时它会夹在历史中间。
+     * 打开后 system message 始终在第一条，换分身只换内容、不挪位置。</p>
      */
     @Bean
     public ChatMemoryProvider chatMemoryProvider(RedisChatMemoryStore chatMemoryStore) {
@@ -80,6 +94,75 @@ public class AiConfig {
                 .id(memoryId)
                 .maxMessages(properties.getMemory().getMaxMessages())
                 .chatMemoryStore(chatMemoryStore)
+                .alwaysKeepSystemMessageFirst(true)
+                .build();
+    }
+
+    /**
+     * 分诊台：每轮问答的第一跳，把问句归入 背诗 / 查字 / 闲聊 三类。
+     *
+     * <p>不带记忆、不带工具：分类只看当前这句话，用完即弃。模型与对话模型同一套地址、密钥、
+     * 模型名，只有 temperature 单独配到 0（取值见 application.yml）——分诊是分类，同一句话每次
+     * 应归同一类。判据全部写进 router-prompt.txt，装配时读一次。</p>
+     */
+    @Bean
+    public RouterAgent routerAgent() {
+        AiProperties.Chat chat = properties.getChat();
+        ChatModel routerModel = OpenAiChatModel.builder()
+                .baseUrl(chat.getBaseUrl())
+                .apiKey(chat.getApiKey())
+                .modelName(chat.getModelName())
+                .temperature(chat.getRouterTemperature())
+                .listeners(new ChatModelLogListener())
+                .build();
+        String systemPrompt = readPrompt("prompts/router-prompt.txt");
+        return AiServices.builder(RouterAgent.class)
+                .chatModel(routerModel)
+                .systemMessageProvider(memoryId -> systemPrompt)
+                .build();
+    }
+
+    /**
+     * 背诗专才：只挂古诗检索一个工具，人设只讲古诗（poem-tutor-prompt.txt）。
+     * 记忆、护栏、流式的装配与全能伴读同一套，只有工具组和人设换成专才的。
+     */
+    @Bean
+    public PoemTutor poemTutor(ChatModel chatModel,
+                           StreamingChatModel streamingChatModel,
+                           ChatMemoryProvider chatMemoryProvider,
+                           PoemSearchTool poemSearchTool,
+                           ToolCallLimiter toolCallLimiter,
+                           ToolStatusHub toolStatusHub) {
+        String systemPrompt = readPrompt("prompts/poem-tutor-prompt.txt");
+        return AiServices.builder(PoemTutor.class)
+                .chatModel(chatModel)
+                .streamingChatModel(streamingChatModel)
+                .chatMemoryProvider(chatMemoryProvider)
+                .systemMessageProvider(memoryId -> systemPrompt)
+                .tools(poemToolsWithGuardrail(poemSearchTool, toolCallLimiter, toolStatusHub))
+                .maxToolCallingRoundTrips(properties.getTool().getMaxRoundTrips())
+                .build();
+    }
+
+    /**
+     * 查字专才：只挂生字表两个查询工具，人设只讲生字（hanzi-tutor-prompt.txt）。
+     * 装配结构与背诗专才同构，差异只在工具组与人设。
+     */
+    @Bean
+    public HanziTutor hanziTutor(ChatModel chatModel,
+                           StreamingChatModel streamingChatModel,
+                           ChatMemoryProvider chatMemoryProvider,
+                           HanziTool hanziTool,
+                           ToolCallLimiter toolCallLimiter,
+                           ToolStatusHub toolStatusHub) {
+        String systemPrompt = readPrompt("prompts/hanzi-tutor-prompt.txt");
+        return AiServices.builder(HanziTutor.class)
+                .chatModel(chatModel)
+                .streamingChatModel(streamingChatModel)
+                .chatMemoryProvider(chatMemoryProvider)
+                .systemMessageProvider(memoryId -> systemPrompt)
+                .tools(hanziToolsWithGuardrail(hanziTool, toolCallLimiter, toolStatusHub))
+                .maxToolCallingRoundTrips(properties.getTool().getMaxRoundTrips())
                 .build();
     }
 
@@ -95,6 +178,9 @@ public class AiConfig {
      *
      * <p>v0.4 起 {@link HanziTool} 的两个生字表查询加入挂载：古诗语义检索与
      * 生字结构化查询两套检索并存，路由由模型按各工具的说明书自行决定。</p>
+     *
+     * <p>v0.5.1 起它是分诊的兜底分身：背诗、查字各有专才，其余（含分不准的）都落到
+     * 这里——全工具全人设，误分诊也接得住。</p>
      */
     @Bean
     public Companion companion(ChatModel chatModel,
@@ -104,31 +190,48 @@ public class AiConfig {
                            HanziTool hanziTool,
                            ToolCallLimiter toolCallLimiter,
                            ToolStatusHub toolStatusHub) {
-        String systemPrompt = readSystemPrompt();
+        String systemPrompt = readPrompt("prompts/system-prompt.txt");
         return AiServices.builder(Companion.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(chatMemoryProvider)
                 .systemMessageProvider(memoryId -> systemPrompt)
-                .tools(toolsWithGuardrails(poemSearchTool, hanziTool, toolCallLimiter, toolStatusHub))
+                .tools(allToolsWithGuardrails(poemSearchTool, hanziTool, toolCallLimiter, toolStatusHub))
                 .maxToolCallingRoundTrips(properties.getTool().getMaxRoundTrips())
                 .build();
     }
 
     /**
-     * 全部工具包上护栏后交给 AiServices（v0.4 起共三个：古诗语义检索、
-     * 查字→课、按课列字）。工具描述仍从 {@code @Tool} 注解反射生成
-     * （{@code @ToolMemoryId} 参数不进描述），执行链从直接调用方法变为“护栏 → 方法”。
-     * 方法签名变更时此处启动即抛出异常，异常消息带有定位提示。
+     * 全部三个工具包上护栏后交给兜底伴读：古诗组与生字组各自装好再合并，
+     * 两组同时就是背诗、查字两个专才的工具清单。工具描述仍从 {@code @Tool} 注解
+     * 反射生成（{@code @ToolMemoryId} 参数不进描述），执行链从直接调用方法变为
+     * “护栏 → 方法”。方法签名变更时此处启动即抛出异常，异常消息带有定位提示。
      */
-    private List<AiServiceTool> toolsWithGuardrails(PoemSearchTool poemSearchTool,
+    private List<AiServiceTool> allToolsWithGuardrails(PoemSearchTool poemSearchTool,
                                                     HanziTool hanziTool,
                                                     ToolCallLimiter toolCallLimiter,
                                                     ToolStatusHub toolStatusHub) {
+        return Stream.concat(
+                poemToolsWithGuardrail(poemSearchTool, toolCallLimiter, toolStatusHub).stream(),
+                hanziToolsWithGuardrail(hanziTool, toolCallLimiter, toolStatusHub).stream())
+                .toList();
+    }
+
+    /** 背诗专才的工具组：只有古诗语义检索一个。 */
+    private List<AiServiceTool> poemToolsWithGuardrail(PoemSearchTool poemSearchTool,
+                                                   ToolCallLimiter toolCallLimiter,
+                                                   ToolStatusHub toolStatusHub) {
         return List.of(
                 guardTool(poemSearchTool, "searchPoems",
                         new Class<?>[] {String.class, String.class},
-                        "字问先生正在翻古诗书…", toolCallLimiter, toolStatusHub),
+                        "字问先生正在翻古诗书…", toolCallLimiter, toolStatusHub));
+    }
+
+    /** 查字专才的工具组：查字→课、按课列字两个。 */
+    private List<AiServiceTool> hanziToolsWithGuardrail(HanziTool hanziTool,
+                                                    ToolCallLimiter toolCallLimiter,
+                                                    ToolStatusHub toolStatusHub) {
+        return List.of(
                 guardTool(hanziTool, "findLessonsByHanzi",
                         new Class<?>[] {String.class, String.class},
                         "字问先生正在翻生字表…", toolCallLimiter, toolStatusHub),
@@ -168,14 +271,15 @@ public class AiConfig {
     }
 
     /**
-     * 人设 system prompt 独立存放于 prompts/system-prompt.txt。
-     * 启动装配时读取一次，之后所有会话共用同一份。
+     * 读取 classpath 下 prompts/ 目录里的一份说明书。调用方在装配时读一次存成局部变量，
+     * 之后所有轮次共用同一份；文件缺失启动即抛出，不会拖到第一次对话。
+     * 路径作参数：分身各有各的人设文件，不再只有伴读一份。
      */
-    private String readSystemPrompt() {
-        try (var in = new ClassPathResource("prompts/system-prompt.txt").getInputStream()) {
+    private String readPrompt(String path) {
+        try (var in = new ClassPathResource(path).getInputStream()) {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("读取人设 prompt 失败：prompts/system-prompt.txt", e);
+            throw new IllegalStateException("读取 prompt 失败：" + path, e);
         }
     }
 }
